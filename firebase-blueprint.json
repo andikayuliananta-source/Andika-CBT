@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Pengguna guru atau administrator CBT CERIA",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Nama lengkap guru atau admin", "maxLength": 100 },
+        "email": { "type": "string", "description": "Alamat email guru", "maxLength": 150 },
+        "role": { "type": "string", "description": "Peran pengguna", "enum": ["admin", "teacher"] },
+        "status": { "type": "string", "description": "Status akun pengguna", "enum": ["ACTIVE", "INACTIVE"] },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan akun" }
+      },
+      "required": ["uid", "name", "email", "role", "status", "createdAt"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Data ujian CBT",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "description": "ID unik ujian" },
+        "title": { "type": "string", "description": "Judul ujian", "maxLength": 150 },
+        "subject": { "type": "string", "description": "Mata pelajaran", "maxLength": 100 },
+        "grade": { "type": "string", "description": "Tingkat kelas SD (1-6)", "enum": ["1", "2", "3", "4", "5", "6"] },
+        "phase": { "type": "string", "description": "Fase kurikulum SD", "enum": ["A", "B", "C"] },
+        "description": { "type": "string", "description": "Petunjuk atau deskripsi ujian", "maxLength": 500 },
+        "token": { "type": "string", "description": "Token akses ujian siswa", "maxLength": 20 },
+        "startAt": { "type": "string", "format": "date-time", "description": "Tanggal dan waktu mulai ujian" },
+        "endAt": { "type": "string", "format": "date-time", "description": "Tanggal dan waktu berakhir ujian" },
+        "durationMinutes": { "type": "number", "description": "Durasi ujian dalam menit" },
+        "kkm": { "type": "number", "description": "Kriteria Ketuntasan Minimal" },
+        "status": { "type": "string", "description": "Status ujian", "enum": ["DRAFT", "ACTIVE", "FINISHED", "INACTIVE"] },
+        "showScore": { "type": "boolean", "description": "Tampilkan nilai langsung kepada siswa setelah submit" },
+        "showAnswerReview": { "type": "boolean", "description": "Tampilkan pembahasan kepada siswa" },
+        "shuffleQuestions": { "type": "boolean", "description": "Acak urutan soal" },
+        "shuffleOptions": { "type": "boolean", "description": "Acak pilihan jawaban A B C D" },
+        "createdBy": { "type": "string", "description": "UID guru pembuat ujian" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan ujian" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan ujian" }
+      },
+      "required": ["examId", "title", "subject", "grade", "token", "durationMinutes", "kkm", "status", "createdBy", "createdAt"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Butir soal ujian",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string", "description": "ID unik butir soal" },
+        "examId": { "type": "string", "description": "ID ujian induk" },
+        "number": { "type": "number", "description": "Nomor urut soal" },
+        "question": { "type": "string", "description": "Teks pertanyaan", "maxLength": 5000 },
+        "imageUrl": { "type": "string", "description": "URL gambar soal (opsional)", "maxLength": 1000 },
+        "optionA": { "type": "string", "description": "Pilihan A", "maxLength": 1000 },
+        "optionB": { "type": "string", "description": "Pilihan B", "maxLength": 1000 },
+        "optionC": { "type": "string", "description": "Pilihan C", "maxLength": 1000 },
+        "optionD": { "type": "string", "description": "Pilihan D", "maxLength": 1000 },
+        "correctAnswer": { "type": "string", "description": "Kunci jawaban benar (A/B/C/D)", "enum": ["A", "B", "C", "D"] },
+        "weight": { "type": "number", "description": "Bobot nilai butir soal" },
+        "explanation": { "type": "string", "description": "Pembahasan soal", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan butir soal" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan butir soal" }
+      },
+      "required": ["questionId", "examId", "number", "question", "optionA", "optionB", "correctAnswer", "weight"]
+    },
+    "Participant": {
+      "title": "Participant",
+      "description": "Sesi peserta ujian siswa SD",
+      "type": "object",
+      "properties": {
+        "participantId": { "type": "string", "description": "ID unik peserta / sesi ujian" },
+        "examId": { "type": "string", "description": "ID ujian yang diikuti" },
+        "userId": { "type": "string", "description": "Firebase Auth UID peserta (anonymous)" },
+        "name": { "type": "string", "description": "Nama lengkap siswa", "maxLength": 100 },
+        "school": { "type": "string", "description": "Asal sekolah siswa", "maxLength": 100 },
+        "grade": { "type": "string", "description": "Kelas siswa", "enum": ["1", "2", "3", "4", "5", "6"] },
+        "startedAt": { "type": "string", "format": "date-time", "description": "Waktu resmi mulai ujian" },
+        "endAt": { "type": "string", "format": "date-time", "description": "Batas waktu resmi selesai ujian" },
+        "finishedAt": { "type": "string", "format": "date-time", "description": "Waktu selesai submit ujian" },
+        "status": { "type": "string", "description": "Status pengerjaan", "enum": ["NOT_STARTED", "IN_PROGRESS", "SUBMITTED", "TIMEOUT"] },
+        "tabSwitchCount": { "type": "number", "description": "Jumlah pelanggaran pindah tab/window" }
+      },
+      "required": ["participantId", "examId", "name", "school", "grade", "startedAt", "endAt", "status"]
+    },
+    "Answer": {
+      "title": "Answer",
+      "description": "Jawaban peserta untuk satu soal",
+      "type": "object",
+      "properties": {
+        "answerId": { "type": "string", "description": "ID jawaban" },
+        "participantId": { "type": "string", "description": "ID peserta" },
+        "examId": { "type": "string", "description": "ID ujian" },
+        "questionId": { "type": "string", "description": "ID butir soal" },
+        "answer": { "type": "string", "description": "Jawaban yang dipilih (A/B/C/D)", "enum": ["A", "B", "C", "D", ""] },
+        "marked": { "type": "boolean", "description": "Tandai ragu-ragu / periksa lagi" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu autosave terakhir" }
+      },
+      "required": ["answerId", "participantId", "examId", "questionId"]
+    },
+    "Result": {
+      "title": "Result",
+      "description": "Hasil dan rekapitulasi penilaian ujian siswa",
+      "type": "object",
+      "properties": {
+        "resultId": { "type": "string", "description": "ID hasil ujian" },
+        "participantId": { "type": "string", "description": "ID peserta" },
+        "examId": { "type": "string", "description": "ID ujian" },
+        "name": { "type": "string", "description": "Nama siswa", "maxLength": 100 },
+        "school": { "type": "string", "description": "Asal sekolah", "maxLength": 100 },
+        "grade": { "type": "string", "description": "Kelas", "enum": ["1", "2", "3", "4", "5", "6"] },
+        "totalQuestions": { "type": "number", "description": "Total butir soal" },
+        "correctAnswers": { "type": "number", "description": "Jumlah jawaban benar" },
+        "wrongAnswers": { "type": "number", "description": "Jumlah jawaban salah" },
+        "score": { "type": "number", "description": "Nilai akhir (0-100)" },
+        "status": { "type": "string", "description": "Status kelulusan (LULUS / BELUM LULUS)", "enum": ["LULUS", "BELUM LULUS"] },
+        "startedAt": { "type": "string", "format": "date-time", "description": "Waktu mulai" },
+        "finishedAt": { "type": "string", "format": "date-time", "description": "Waktu selesai" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu kalkulasi hasil" }
+      },
+      "required": ["resultId", "participantId", "examId", "name", "school", "grade", "totalQuestions", "correctAnswers", "wrongAnswers", "score", "status"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Konfigurasi umum aplikasi CBT CERIA",
+      "type": "object",
+      "properties": {
+        "settingId": { "type": "string", "description": "ID pengaturan" },
+        "appName": { "type": "string", "description": "Nama aplikasi", "maxLength": 100 },
+        "schoolName": { "type": "string", "description": "Nama sekolah default", "maxLength": 150 },
+        "defaultDuration": { "type": "number", "description": "Durasi default (menit)" },
+        "defaultKkm": { "type": "number", "description": "KKM default" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan" }
+      },
+      "required": ["settingId", "appName"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Data profil guru dan admin"
+    },
+    "/exams/{examId}": {
+      "schema": "Exam",
+      "description": "Daftar ujian yang dibuat oleh guru"
+    },
+    "/exams/{examId}/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Butir-butir soal pada ujian tertentu"
+    },
+    "/participants/{participantId}": {
+      "schema": "Participant",
+      "description": "Data sesi pengerjaan ujian siswa"
+    },
+    "/participants/{participantId}/answers/{answerId}": {
+      "schema": "Answer",
+      "description": "Jawaban peserta untuk butir soal ujian"
+    },
+    "/results/{resultId}": {
+      "schema": "Result",
+      "description": "Hasil dan skor nilai ujian siswa"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "Pengaturan aplikasi global"
+    }
+  }
+}

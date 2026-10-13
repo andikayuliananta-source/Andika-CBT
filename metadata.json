@@ -1,0 +1,8 @@
+{
+  "name": "CBT CERIA",
+  "description": "Aplikasi CBT Online ramah anak khusus siswa Sekolah Dasar di Indonesia dengan Portal Siswa dan Portal Guru.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
