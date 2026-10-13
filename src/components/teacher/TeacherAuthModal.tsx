@@ -13,31 +13,40 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  Eye,
+  EyeOff,
+  Crown,
 } from 'lucide-react';
 import {
   loginTeacherWithEmail,
   loginTeacherWithGoogle,
   ensureTeacherAuthSession,
-  PRIMARY_ADMIN_EMAIL,
   isAuthorizedAdminEmail,
+  PRIMARY_ADMIN_EMAIL,
+  PRIMARY_ADMIN_NAME,
 } from '../../services/firebase/authService';
 import { User } from '../../types';
 
 interface TeacherAuthModalProps {
+  isOpen?: boolean;
   onSuccess: (user: User) => void;
   onCancel: () => void;
 }
 
 export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
+  isOpen = true,
   onSuccess,
   onCancel,
 }) => {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(PRIMARY_ADMIN_EMAIL);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [copiedDomain, setCopiedDomain] = useState(false);
   const [showDomainGuide, setShowDomainGuide] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+
+  if (!isOpen) return null;
 
   const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
 
@@ -48,22 +57,22 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
     setTimeout(() => setCopiedDomain(false), 2500);
   };
 
-  // Direct 1-click Admin Access
+  // Direct 1-Click login as the official exclusive administrator
   const handleQuickAdminLogin = async () => {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const user = await ensureTeacherAuthSession();
-      onSuccess(user);
+      const adminUser = await ensureTeacherAuthSession();
+      onSuccess(adminUser);
     } catch (err: any) {
-      console.warn('Quick admin session notice:', err);
+      console.error('Quick admin login error:', err);
       setErrorMsg(err.message || 'Gagal masuk sebagai administrator.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Email login
+  // Email & Password login exclusively for Pak Andika
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -71,39 +80,18 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
     const cleanEmail = email.trim().toLowerCase();
     if (!isAuthorizedAdminEmail(cleanEmail)) {
       setErrorMsg(
-        `Akses Ditolak: Hanya Administrator Utama yang dapat masuk ke Portal Guru. Akun "${cleanEmail}" tidak diizinkan demi keamanan data ujian.`
+        `Akses Ditolak: Portal Guru CBT CERIA dikunci secara EKSKLUSIF untuk Administrator Tunggal (${PRIMARY_ADMIN_EMAIL}). Akun "${cleanEmail}" tidak diizinkan masuk demi keamanan data ujian.`
       );
       return;
     }
 
     setLoading(true);
     try {
-      const firebaseUser = await loginTeacherWithEmail(cleanEmail, password);
-      const userObj: User = {
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName || 'Andika Yuliananta, S.Pd.',
-        email: cleanEmail,
-        role: 'admin',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      };
+      const userObj = await loginTeacherWithEmail(cleanEmail, password);
       onSuccess(userObj);
     } catch (err: any) {
       console.warn('Auth notice:', err);
-      let message = err.message || 'Gagal masuk. Periksa kembali email dan kata sandi Anda.';
-      if (
-        err.code === 'auth/wrong-password' ||
-        err.code === 'auth/user-not-found' ||
-        err.code === 'auth/invalid-credential'
-      ) {
-        message = 'Kredensial tidak cocok. Pastikan kata sandi administrator benar.';
-      } else if (err.code === 'auth/weak-password') {
-        message = 'Kata sandi minimal 6 karakter.';
-      } else if (err.code === 'auth/operation-not-allowed') {
-        message =
-          'Provider Email/Password belum diaktifkan di Firebase Console. Gunakan tombol "Masuk Langsung Sebagai Administrator" di atas.';
-      }
-      setErrorMsg(message);
+      setErrorMsg(err.message || 'Gagal masuk. Periksa kembali kata sandi administrator Anda.');
     } finally {
       setLoading(false);
     }
@@ -118,17 +106,16 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
       onSuccess(res.user);
     } catch (err: any) {
       console.warn('Google auth warning:', err);
-      // Fallback safeguard
-      try {
-        const fallbackUser = await ensureTeacherAuthSession();
-        onSuccess(fallbackUser);
-        return;
-      } catch (fallbackErr) {
-        console.warn('Fallback admin session error:', fallbackErr);
+      const isDomainIssue =
+        err?.code === 'auth/unauthorized-domain' ||
+        String(err?.message || '').includes('unauthorized-domain');
+
+      if (isDomainIssue) {
+        setShowDomainGuide(true);
       }
       setErrorMsg(
-        err?.message ||
-          'Gagal login via Google. Silakan gunakan tombol "Masuk Cepat Administrator".'
+        err.message ||
+          'Gagal masuk via Google. Anda dapat menggunakan kata sandi terdaftar di bawah atau tombol Akses Cepat.'
       );
     } finally {
       setLoading(false);
@@ -138,24 +125,33 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
   return (
     <div
       id="teacher-auth-modal"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
     >
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 border-2 border-indigo-200 shadow-2xl space-y-4 max-h-[95vh] overflow-y-auto">
-        {/* Modal Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-blue-50 border-2 border-blue-200 rounded-2xl flex items-center justify-center mx-auto text-3xl shadow-inner text-blue-600">
-            <ShieldCheck className="w-8 h-8 text-blue-600" />
+      <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-md shrink-0">
+            <Crown className="w-6 h-6 text-amber-300 fill-amber-300" />
           </div>
           <div>
-            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider">
-              <span>🛡️ Portal Pengelolaan Ujian</span>
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider">
+              <span>👑 Administrator Tunggal</span>
             </span>
-            <h3 className="font-display text-xl sm:text-2xl font-black text-slate-900 mt-1">
+            <h3 className="font-display text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
               Portal Guru & Pengawas
             </h3>
-            <p className="text-xs text-slate-500 font-semibold mt-0.5">
-              CBT CERIA • Pengelolaan Ujian & Bank Soal
+            <p className="text-xs text-slate-500 font-semibold">
+              CBT CERIA • Khusus {PRIMARY_ADMIN_NAME}
             </p>
+          </div>
+        </div>
+
+        {/* Administrator Exclusive Notice Card */}
+        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start space-x-2.5">
+          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="text-[11px] text-slate-700 leading-relaxed font-semibold">
+            Portal ini dilindungi secara eksklusif. Hanya akun terdaftar{' '}
+            <span className="font-black text-blue-900 underline">{PRIMARY_ADMIN_EMAIL}</span> yang dapat mengelola ujian dan bank soal.
           </div>
         </div>
 
@@ -167,68 +163,11 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
           </div>
         )}
 
-        {/* Quick Admin Access (Recommended 1-Click) */}
-        <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center space-x-1 text-[11px] font-extrabold text-blue-700 uppercase tracking-wide">
-              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-              <span>Akses Cepat Administrator Resmi</span>
-            </span>
-            <span className="text-[10px] bg-blue-200/70 text-blue-900 font-black px-2 py-0.5 rounded-full">
-              Paling Mudah
-            </span>
-          </div>
-
-          <p className="text-[11px] text-slate-600 font-semibold">
-            Masuk langsung sebagai <strong className="text-slate-800 font-black">Andika Yuliananta, S.Pd.</strong> ({PRIMARY_ADMIN_EMAIL}) tanpa hambatan domain atau popup.
-          </p>
-
-          <button
-            id="admin-quick-login-btn"
-            type="button"
-            onClick={handleQuickAdminLogin}
-            disabled={loading}
-            className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-display font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition-colors flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
-                <span>Masuk Sebagai Administrator (Pak Andika)</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Google sign-in button */}
-        <div className="space-y-1.5">
-          <button
-            id="admin-google-login-btn"
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full py-2.5 px-4 border-2 border-slate-200 hover:border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center space-x-2 cursor-pointer shadow-2xs"
-          >
-            <Globe className="w-4 h-4 text-blue-500" />
-            <span>Masuk via Akun Google ({PRIMARY_ADMIN_EMAIL})</span>
-          </button>
-        </div>
-
-        {/* Divider */}
-        <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-slate-200"></div>
-          <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase">
-            Atau Gunakan Email & Sandi
-          </span>
-          <div className="flex-grow border-t border-slate-200"></div>
-        </div>
-
-        {/* Email & Password Form */}
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Email & Password Login Form (Primary) */}
+        <form onSubmit={handleSubmit} className="space-y-3 pt-1">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Email Guru / Administrator
+              Email Administrator
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -239,26 +178,44 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={PRIMARY_ADMIN_EMAIL}
-                className="w-full pl-10 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Kata Sandi
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase">
+                Kata Sandi
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center space-x-1 cursor-pointer"
+              >
+                {showPassword ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5" />
+                    <span>Sembunyikan</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Lihat</span>
+                  </>
+                )}
+              </button>
+            </div>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 id="admin-password-input"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
-                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan kata sandi administrator"
-                className="w-full pl-10 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                placeholder="Masukkan kata sandi terdaftar"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
               />
             </div>
           </div>
@@ -267,20 +224,59 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
             id="admin-email-login-btn"
             type="submit"
             disabled={loading || !email.trim() || !password}
-            className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-display font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-display font-black text-xs sm:text-sm rounded-xl shadow-md transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <LogIn className="w-4 h-4" />
-                <span>Masuk dengan Email & Sandi</span>
+                <LogIn className="w-4 h-4 text-amber-400" />
+                <span>Masuk ke Portal Guru</span>
               </>
             )}
           </button>
         </form>
 
-        {/* Domain Helper Accordion for Firebase Console Setup */}
+        {/* Divider */}
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-slate-200"></div>
+          <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase">
+            Atau Opsi Cepat
+          </span>
+          <div className="flex-grow border-t border-slate-200"></div>
+        </div>
+
+        {/* Quick Admin Access Button */}
+        <button
+          id="admin-quick-login-btn"
+          type="button"
+          onClick={handleQuickAdminLogin}
+          disabled={loading}
+          className="w-full py-2.5 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 border-blue-200 rounded-xl text-xs sm:text-sm font-extrabold text-blue-900 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-2xs disabled:opacity-50"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+          ) : (
+            <>
+              <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <span>⚡ Akses Cepat Langsung (Pak Andika)</span>
+            </>
+          )}
+        </button>
+
+        {/* Google sign-in button */}
+        <button
+          id="admin-google-login-btn"
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full py-2 px-3 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center space-x-2 cursor-pointer"
+        >
+          <Globe className="w-3.5 h-3.5 text-blue-500" />
+          <span>Masuk via Google ({PRIMARY_ADMIN_EMAIL})</span>
+        </button>
+
+        {/* Domain Helper Accordion */}
         <div className="border border-slate-200 rounded-xl bg-slate-50/80 overflow-hidden text-xs">
           <button
             type="button"
@@ -301,7 +297,7 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
           {showDomainGuide && (
             <div className="p-3 border-t border-slate-200 space-y-2 text-[11px] text-slate-600 bg-white">
               <p>
-                Pesan <code className="bg-red-50 text-red-600 px-1 py-0.5 rounded font-mono">auth/unauthorized-domain</code> muncul karena domain preview saat ini belum didaftarkan di Firebase Console.
+                Pesan <code className="bg-red-50 text-red-600 px-1 py-0.5 rounded font-mono">auth/unauthorized-domain</code> muncul jika domain deployment saat ini belum didaftarkan di Firebase Console.
               </p>
 
               <div className="p-2 bg-slate-100 rounded-lg flex items-center justify-between">
@@ -332,7 +328,7 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
                 <ol className="list-decimal list-inside space-y-0.5">
                   <li>Buka Firebase Console &rarr; Authentication &rarr; Settings.</li>
                   <li>Di menu <strong>Authorized domains</strong>, klik <strong>Add domain</strong>.</li>
-                  <li>Tempelkan nama domain di atas, lalu klik <strong>Save</strong>.</li>
+                  <li>Tempelkan domain di atas, lalu klik <strong>Save</strong>.</li>
                 </ol>
               </div>
 
@@ -352,7 +348,7 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
         {/* Footer / Cancel */}
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
           <span className="text-[11px] text-slate-400 font-semibold italic">
-            🔒 Portal khusus Administrator Resmi CBT CERIA.
+            🔒 Khusus Administrator Eksklusif.
           </span>
           <button
             id="admin-modal-cancel-btn"

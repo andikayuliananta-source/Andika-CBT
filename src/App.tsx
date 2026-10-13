@@ -109,10 +109,10 @@ export default function App() {
     if (portal === 'student') {
       setCurrentView('STUDENT_TOKEN');
     } else {
-      if (currentUser && (isAuthorizedAdminEmail(currentUser.email) || currentUser.role === 'admin')) {
+      if (currentUser && isAuthorizedAdminEmail(currentUser.email)) {
         setCurrentView('TEACHER_PORTAL');
       } else {
-        if (currentUser && !isAuthorizedAdminEmail(currentUser.email) && currentUser.role !== 'admin') {
+        if (currentUser && !isAuthorizedAdminEmail(currentUser.email)) {
           logoutTeacher().catch(() => {});
           setCurrentUser(null);
         }
@@ -274,11 +274,10 @@ export default function App() {
 
   // Switch to teacher portal after successful login
   const handleTeacherAuthSuccess = (user: User) => {
-    if (!isAuthorizedAdminEmail(user.email) && user.role !== 'admin') {
+    if (!isAuthorizedAdminEmail(user.email)) {
       logoutTeacher().catch(() => {});
-      setCurrentUser(user);
+      setCurrentUser(null);
       setShowTeacherAuthModal(false);
-      setCurrentView('TEACHER_PORTAL');
       return;
     }
     setCurrentUser(user);
@@ -425,7 +424,7 @@ export default function App() {
         )}
 
         {currentView === 'TEACHER_PORTAL' && (
-          currentUser && (isAuthorizedAdminEmail(currentUser.email) || currentUser.role === 'admin') ? (
+          currentUser && isAuthorizedAdminEmail(currentUser.email) ? (
             <TeacherPortal
               currentUser={currentUser}
               onLogout={() => {

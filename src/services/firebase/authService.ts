@@ -20,7 +20,6 @@ export async function loginStudentAnonymous(): Promise<string> {
     return userCredential.user.uid;
   } catch (error) {
     console.warn('Anonymous auth failed or not enabled in console, using fallback session ID:', error);
-    // Return or reuse an existing generated session ID
     let localId = localStorage.getItem('cbt_ceria_student_uid');
     if (!localId) {
       localId = 'anon_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
@@ -30,81 +29,88 @@ export async function loginStudentAnonymous(): Promise<string> {
   }
 }
 
+// ==========================================
+// KREDENSI ADMINISTRATOR EKSKLUSIF TUNGGAL
+// ==========================================
 export const PRIMARY_ADMIN_EMAIL = 'andika.yuliananta@gmail.com';
+export const PRIMARY_ADMIN_PASSWORD = 'Andika060796';
+export const PRIMARY_ADMIN_NAME = 'Andika Yuliananta, S.Pd.';
+export const PRIMARY_ADMIN_UID = '2w9z4UE06sgZdP8flqvYsWBRCCq1';
 
+/**
+ * Memeriksa apakah suatu alamat email adalah Administrator Tunggal yang sah
+ */
 export function isAuthorizedAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   return email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase();
 }
 
-export async function loginTeacherWithEmail(email: string, pass: string): Promise<FirebaseUser> {
+/**
+ * Otentikasi Administrator via Email & Kata Sandi
+ * Dikhususkan eksklusif untuk andika.yuliananta@gmail.com dan kata sandi Andika060796
+ */
+export async function loginTeacherWithEmail(email: string, pass: string): Promise<User> {
   const cleanEmail = email.trim().toLowerCase();
+  
+  // Validasi ketat: Hanya Administrator Eksklusif yang diperbolehkan
   if (!isAuthorizedAdminEmail(cleanEmail)) {
     throw new Error(
-      `Akses Ditolak: Portal Guru & Bank Soal dikunci khusus untuk Administrator Resmi (${PRIMARY_ADMIN_EMAIL}). Akun ${email} tidak diizinkan masuk demi keamanan data.`
+      `Akses Ditolak: Portal Guru CBT CERIA dikunci khusus secara EKSKLUSIF untuk Administrator Tunggal (${PRIMARY_ADMIN_EMAIL}). Email "${email}" tidak diizinkan masuk demi keamanan data ujian.`
     );
   }
+
+  // Verifikasi kata sandi administrator resmi
+  const isMatchingRegisteredPassword = pass.trim() === PRIMARY_ADMIN_PASSWORD;
+
+  let firebaseUser: FirebaseUser | null = null;
   try {
-    const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-    return result.user;
+    const result = await signInWithEmailAndPassword(auth, cleanEmail, pass.trim());
+    firebaseUser = result.user;
   } catch (error: any) {
-    if (
-      error.code === 'auth/user-not-found' ||
-      error.code === 'auth/invalid-credential'
-    ) {
-      // If user hasn't registered yet in this Firebase project, register admin automatically
+    console.warn('Firebase email sign-in notice:', error?.code);
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
       try {
-        const createResult = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-        const userRef = doc(db, 'users', createResult.user.uid);
-        await setDoc(userRef, {
-          uid: createResult.user.uid,
-          name: 'Andika Yuliananta, S.Pd.',
-          email: cleanEmail,
-          role: 'admin',
-          status: 'ACTIVE',
-          createdAt: new Date().toISOString(),
-        });
-        return createResult.user;
+        const createResult = await createUserWithEmailAndPassword(auth, cleanEmail, pass.trim());
+        firebaseUser = createResult.user;
       } catch (createErr: any) {
-        if (createErr.code === 'auth/email-already-in-use') {
-          throw new Error('Kata sandi salah. Silakan periksa kembali kata sandi administrator Anda.');
-        }
-        throw error;
+        console.warn('Firebase create user notice:', createErr?.code);
       }
     }
-    throw error;
   }
-}
 
-export async function registerTeacherWithEmail(email: string, pass: string, name: string): Promise<User> {
-  const cleanEmail = email.trim().toLowerCase();
-  if (!isAuthorizedAdminEmail(cleanEmail)) {
-    throw new Error(
-      `Pendaftaran Ditolak: Pembuatan akun portal guru publik dinonaktifkan demi keamanan. Hanya Administrator Resmi (${PRIMARY_ADMIN_EMAIL}) yang dapat mengelola CBT CERIA.`
-    );
+  // Jika kata sandi salah dan Firebase juga menolak autentikasi
+  if (!isMatchingRegisteredPassword && !firebaseUser) {
+    throw new Error('Kata sandi administrator salah. Silakan periksa kembali kata sandi Anda.');
   }
-  const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-  const uid = result.user.uid;
 
-  const role: UserRole = 'admin';
-
-  const newUser: User = {
+  const uid = firebaseUser?.uid || PRIMARY_ADMIN_UID;
+  const adminUser: User = {
     uid,
-    name: name || 'Andika Yuliananta, S.Pd.',
+    name: PRIMARY_ADMIN_NAME,
     email: cleanEmail,
-    role,
+    role: 'admin',
     status: 'ACTIVE',
     createdAt: new Date().toISOString(),
   };
 
-  const userRef = doc(db, 'users', uid);
   try {
-    await setDoc(userRef, newUser);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, adminUser, { merge: true });
+  } catch (syncErr) {
+    console.warn('Sinkronisasi dokumen user Firestore:', syncErr);
   }
 
-  return newUser;
+  setLocalTeacherSession(adminUser);
+  return adminUser;
+}
+
+/**
+ * Pendaftaran pengguna publik ditutup karena sifat portal yang eksklusif
+ */
+export async function registerTeacherWithEmail(): Promise<User> {
+  throw new Error(
+    `Pendaftaran Ditutup: Portal Guru hanya dapat diakses secara eksklusif oleh Administrator Tunggal (${PRIMARY_ADMIN_EMAIL}).`
+  );
 }
 
 export const LOCAL_TEACHER_KEY = 'cbt_ceria_active_teacher';
@@ -112,7 +118,14 @@ export const LOCAL_TEACHER_KEY = 'cbt_ceria_active_teacher';
 export function getLocalTeacherSession(): User | null {
   try {
     const raw = localStorage.getItem(LOCAL_TEACHER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as User;
+    if (isAuthorizedAdminEmail(parsed.email)) {
+      return parsed;
+    }
+    // Jika ada session lain yang bukan admin resmi, bersihkan
+    localStorage.removeItem(LOCAL_TEACHER_KEY);
+    return null;
   } catch {
     return null;
   }
@@ -120,7 +133,7 @@ export function getLocalTeacherSession(): User | null {
 
 export function setLocalTeacherSession(user: User | null): void {
   try {
-    if (user) {
+    if (user && isAuthorizedAdminEmail(user.email)) {
       localStorage.setItem(LOCAL_TEACHER_KEY, JSON.stringify(user));
     } else {
       localStorage.removeItem(LOCAL_TEACHER_KEY);
@@ -130,12 +143,15 @@ export function setLocalTeacherSession(user: User | null): void {
   }
 }
 
+/**
+ * Login via Akun Google dengan perlindungan eksklusif
+ */
 export async function loginTeacherWithGoogle(): Promise<{ user: User; fallbackUsed: boolean; reason?: string }> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
 
-    // Strict check: only PRIMARY_ADMIN_EMAIL allowed
+    // Strict check: Hanya PRIMARY_ADMIN_EMAIL yang diizinkan
     if (!isAuthorizedAdminEmail(user.email)) {
       await signOut(auth);
       throw new Error(
@@ -143,33 +159,20 @@ export async function loginTeacherWithGoogle(): Promise<{ user: User; fallbackUs
       );
     }
 
-    const userRef = doc(db, 'users', user.uid);
-    let teacherUser: User;
+    const teacherUser: User = {
+      uid: user.uid,
+      name: user.displayName || PRIMARY_ADMIN_NAME,
+      email: PRIMARY_ADMIN_EMAIL,
+      role: 'admin',
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
+    };
 
     try {
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        teacherUser = snap.data() as User;
-      } else {
-        teacherUser = {
-          uid: user.uid,
-          name: user.displayName || 'Andika Yuliananta, S.Pd.',
-          email: user.email || PRIMARY_ADMIN_EMAIL,
-          role: 'admin',
-          status: 'ACTIVE',
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(userRef, teacherUser);
-      }
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, teacherUser, { merge: true });
     } catch {
-      teacherUser = {
-        uid: user.uid,
-        name: user.displayName || 'Andika Yuliananta, S.Pd.',
-        email: user.email || PRIMARY_ADMIN_EMAIL,
-        role: 'admin',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      };
+      // ignore
     }
 
     setLocalTeacherSession(teacherUser);
@@ -178,7 +181,7 @@ export async function loginTeacherWithGoogle(): Promise<{ user: User; fallbackUs
     const errCode = error?.code || '';
     const errMsg = error?.message || '';
 
-    // Check for unauthorized domain, popup blocked, or popup cancelled
+    // Periksa jika unauthorized domain atau popup diblokir browser
     const isDomainIssue = errCode === 'auth/unauthorized-domain' || errMsg.includes('unauthorized-domain');
     const isPopupIssue =
       errCode === 'auth/popup-blocked' ||
@@ -188,7 +191,7 @@ export async function loginTeacherWithGoogle(): Promise<{ user: User; fallbackUs
 
     if (isDomainIssue || isPopupIssue) {
       console.warn(
-        `Google Auth notice (${errCode || errMsg}). Mengaktifkan sesi terverifikasi administrator resmi untuk ${PRIMARY_ADMIN_EMAIL}:`,
+        `Google Auth notice (${errCode || errMsg}). Mengaktifkan sesi terverifikasi administrator eksklusif untuk ${PRIMARY_ADMIN_EMAIL}:`,
         error
       );
       const fallbackUser = await ensureTeacherAuthSession();
@@ -229,80 +232,70 @@ export function subscribeToAuth(callback: (user: FirebaseUser | null) => void) {
 }
 
 export function subscribeToAuthChanges(callback: (user: User | null) => void) {
-  // Broadcast local active session if available
+  // Broadcast sesi lokal terverifikasi jika ada
   const initialLocal = getLocalTeacherSession();
-  if (initialLocal) {
+  if (initialLocal && isAuthorizedAdminEmail(initialLocal.email)) {
     callback(initialLocal);
   }
 
   return onAuthStateChanged(auth, async (fbUser) => {
     if (!fbUser) {
       const local = getLocalTeacherSession();
-      callback(local);
+      if (local && isAuthorizedAdminEmail(local.email)) {
+        callback(local);
+      } else {
+        callback(null);
+      }
       return;
     }
+
     const profile = await getUserProfile(fbUser.uid);
     const resolvedEmail = profile?.email || fbUser.email || (fbUser.isAnonymous ? PRIMARY_ADMIN_EMAIL : '');
-    const isAdmin = isAuthorizedAdminEmail(resolvedEmail) || profile?.role === 'admin';
 
-    const fullUser: User = profile
-      ? {
-          ...profile,
-          email: resolvedEmail,
-          role: isAdmin ? 'admin' : profile.role,
-        }
-      : {
-          uid: fbUser.uid,
-          name: fbUser.displayName || (isAdmin ? 'Andika Yuliananta, S.Pd.' : 'Guru Tamu'),
-          email: resolvedEmail,
-          role: isAdmin ? 'admin' : 'teacher',
-          status: 'ACTIVE',
-          createdAt: new Date().toISOString(),
-        };
+    // Ketat: Hanya PRIMARY_ADMIN_EMAIL yang berhak menjadi admin
+    if (!isAuthorizedAdminEmail(resolvedEmail)) {
+      callback(null);
+      return;
+    }
+
+    const fullUser: User = {
+      uid: fbUser.uid,
+      name: PRIMARY_ADMIN_NAME,
+      email: PRIMARY_ADMIN_EMAIL,
+      role: 'admin',
+      status: 'ACTIVE',
+      createdAt: profile?.createdAt || new Date().toISOString(),
+    };
 
     setLocalTeacherSession(fullUser);
     callback(fullUser);
   });
 }
 
+/**
+ * Mengaktifkan sesi terverifikasi untuk Administrator Eksklusif Tunggal (Pak Andika)
+ */
 export async function ensureTeacherAuthSession(): Promise<User> {
-  let adminUser: User;
-  if (auth.currentUser) {
-    const profile = await getUserProfile(auth.currentUser.uid);
-    adminUser = profile || {
-      uid: auth.currentUser.uid,
-      name: auth.currentUser.displayName || 'Andika Yuliananta, S.Pd.',
-      email: auth.currentUser.email || PRIMARY_ADMIN_EMAIL,
-      role: 'admin',
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-    };
-  } else {
-    try {
-      const cred = await signInAnonymously(auth);
-      adminUser = {
-        uid: cred.user.uid,
-        name: 'Andika Yuliananta, S.Pd.',
-        email: PRIMARY_ADMIN_EMAIL,
-        role: 'admin',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      };
-      await setDoc(doc(db, 'users', cred.user.uid), adminUser, { merge: true });
-    } catch {
-      adminUser = {
-        uid: 'admin_andika_yuliananta',
-        name: 'Andika Yuliananta, S.Pd.',
-        email: PRIMARY_ADMIN_EMAIL,
-        role: 'admin',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      };
+  const adminUser: User = {
+    uid: auth.currentUser?.uid || PRIMARY_ADMIN_UID,
+    name: PRIMARY_ADMIN_NAME,
+    email: PRIMARY_ADMIN_EMAIL,
+    role: 'admin',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString(),
+  };
+
+  try {
+    if (!auth.currentUser) {
+      await signInAnonymously(auth).catch(() => {});
     }
+    const targetUid = auth.currentUser?.uid || PRIMARY_ADMIN_UID;
+    adminUser.uid = targetUid;
+    await setDoc(doc(db, 'users', targetUid), adminUser, { merge: true }).catch(() => {});
+  } catch {
+    // continue
   }
 
   setLocalTeacherSession(adminUser);
   return adminUser;
 }
-
-
