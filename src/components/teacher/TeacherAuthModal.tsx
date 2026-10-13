@@ -6,7 +6,6 @@ import {
   Loader2,
   ShieldCheck,
   ShieldAlert,
-  Zap,
   Globe,
   Copy,
   Check,
@@ -20,7 +19,6 @@ import {
 import {
   loginTeacherWithEmail,
   loginTeacherWithGoogle,
-  ensureTeacherAuthSession,
   isAuthorizedAdminEmail,
   PRIMARY_ADMIN_EMAIL,
   PRIMARY_ADMIN_NAME,
@@ -55,21 +53,6 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
     navigator.clipboard.writeText(currentHostname);
     setCopiedDomain(true);
     setTimeout(() => setCopiedDomain(false), 2500);
-  };
-
-  // Direct 1-Click login as the official exclusive administrator
-  const handleQuickAdminLogin = async () => {
-    setErrorMsg(null);
-    setLoading(true);
-    try {
-      const adminUser = await ensureTeacherAuthSession();
-      onSuccess(adminUser);
-    } catch (err: any) {
-      console.error('Quick admin login error:', err);
-      setErrorMsg(err.message || 'Gagal masuk sebagai administrator.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Email & Password login exclusively for Pak Andika
@@ -115,7 +98,7 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
       }
       setErrorMsg(
         err.message ||
-          'Gagal masuk via Google. Anda dapat menggunakan kata sandi terdaftar di bawah atau tombol Akses Cepat.'
+          'Gagal masuk via Google. Anda dapat masuk menggunakan email dan kata sandi administrator di atas.'
       );
     } finally {
       setLoading(false);
@@ -241,28 +224,10 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
         <div className="relative flex py-1 items-center">
           <div className="flex-grow border-t border-slate-200"></div>
           <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase">
-            Atau Opsi Cepat
+            Atau Masuk via Google
           </span>
           <div className="flex-grow border-t border-slate-200"></div>
         </div>
-
-        {/* Quick Admin Access Button */}
-        <button
-          id="admin-quick-login-btn"
-          type="button"
-          onClick={handleQuickAdminLogin}
-          disabled={loading}
-          className="w-full py-2.5 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 border-blue-200 rounded-xl text-xs sm:text-sm font-extrabold text-blue-900 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-2xs disabled:opacity-50"
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-          ) : (
-            <>
-              <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
-              <span>⚡ Akses Cepat Langsung (Pak Andika)</span>
-            </>
-          )}
-        </button>
 
         {/* Google sign-in button */}
         <button
@@ -270,9 +235,9 @@ export const TeacherAuthModal: React.FC<TeacherAuthModalProps> = ({
           type="button"
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full py-2 px-3 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center space-x-2 cursor-pointer"
+          className="w-full py-2.5 px-3 border border-slate-200 hover:border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center space-x-2 cursor-pointer shadow-2xs"
         >
-          <Globe className="w-3.5 h-3.5 text-blue-500" />
+          <Globe className="w-4 h-4 text-blue-500" />
           <span>Masuk via Google ({PRIMARY_ADMIN_EMAIL})</span>
         </button>
 
