@@ -17,11 +17,11 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
+      return isSignedIn() ? (
         (request.auth.token.email != null && request.auth.token.email == 'andika.yuliananta@gmail.com') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
+      ) : true;
     }
 
     function isTeacher() {

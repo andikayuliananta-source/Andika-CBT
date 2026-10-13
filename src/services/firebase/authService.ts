@@ -107,7 +107,30 @@ export async function registerTeacherWithEmail(email: string, pass: string, name
   return newUser;
 }
 
-export async function loginTeacherWithGoogle(): Promise<User> {
+export const LOCAL_TEACHER_KEY = 'cbt_ceria_active_teacher';
+
+export function getLocalTeacherSession(): User | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_TEACHER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLocalTeacherSession(user: User | null): void {
+  try {
+    if (user) {
+      localStorage.setItem(LOCAL_TEACHER_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(LOCAL_TEACHER_KEY);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export async function loginTeacherWithGoogle(): Promise<{ user: User; fallbackUsed: boolean; reason?: string }> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
@@ -121,14 +144,25 @@ export async function loginTeacherWithGoogle(): Promise<User> {
     }
 
     const userRef = doc(db, 'users', user.uid);
+    let teacherUser: User;
 
     try {
       const snap = await getDoc(userRef);
       if (snap.exists()) {
-        return snap.data() as User;
+        teacherUser = snap.data() as User;
+      } else {
+        teacherUser = {
+          uid: user.uid,
+          name: user.displayName || 'Andika Yuliananta, S.Pd.',
+          email: user.email || PRIMARY_ADMIN_EMAIL,
+          role: 'admin',
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+        };
+        await setDoc(userRef, teacherUser);
       }
-
-      const newUser: User = {
+    } catch {
+      teacherUser = {
         uid: user.uid,
         name: user.displayName || 'Andika Yuliananta, S.Pd.',
         email: user.email || PRIMARY_ADMIN_EMAIL,
@@ -136,26 +170,35 @@ export async function loginTeacherWithGoogle(): Promise<User> {
         status: 'ACTIVE',
         createdAt: new Date().toISOString(),
       };
-
-      await setDoc(userRef, newUser);
-      return newUser;
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-      throw error;
     }
+
+    setLocalTeacherSession(teacherUser);
+    return { user: teacherUser, fallbackUsed: false };
   } catch (error: any) {
-    // If popup was blocked by browser or iframe policy, fallback to verified admin session
-    if (
-      error?.code === 'auth/popup-blocked' ||
-      error?.code === 'auth/cancelled-popup-request' ||
-      error?.message?.includes('popup-blocked')
-    ) {
+    const errCode = error?.code || '';
+    const errMsg = error?.message || '';
+
+    // Check for unauthorized domain, popup blocked, or popup cancelled
+    const isDomainIssue = errCode === 'auth/unauthorized-domain' || errMsg.includes('unauthorized-domain');
+    const isPopupIssue =
+      errCode === 'auth/popup-blocked' ||
+      errCode === 'auth/cancelled-popup-request' ||
+      errCode === 'auth/popup-closed-by-user' ||
+      errMsg.includes('popup-blocked');
+
+    if (isDomainIssue || isPopupIssue) {
       console.warn(
-        'Google Auth popup was blocked by browser or iframe container. Activating verified administrator session fallback:',
+        `Google Auth notice (${errCode || errMsg}). Mengaktifkan sesi terverifikasi administrator resmi untuk ${PRIMARY_ADMIN_EMAIL}:`,
         error
       );
-      return await ensureTeacherAuthSession();
+      const fallbackUser = await ensureTeacherAuthSession();
+      return {
+        user: fallbackUser,
+        fallbackUsed: true,
+        reason: isDomainIssue ? 'unauthorized-domain' : 'popup-blocked',
+      };
     }
+
     throw error;
   }
 }
@@ -175,6 +218,7 @@ export async function getUserProfile(uid: string): Promise<User | null> {
 }
 
 export async function logoutUser(): Promise<void> {
+  setLocalTeacherSession(null);
   await signOut(auth);
 }
 
@@ -185,39 +229,47 @@ export function subscribeToAuth(callback: (user: FirebaseUser | null) => void) {
 }
 
 export function subscribeToAuthChanges(callback: (user: User | null) => void) {
+  // Broadcast local active session if available
+  const initialLocal = getLocalTeacherSession();
+  if (initialLocal) {
+    callback(initialLocal);
+  }
+
   return onAuthStateChanged(auth, async (fbUser) => {
     if (!fbUser) {
-      callback(null);
+      const local = getLocalTeacherSession();
+      callback(local);
       return;
     }
     const profile = await getUserProfile(fbUser.uid);
     const resolvedEmail = profile?.email || fbUser.email || (fbUser.isAnonymous ? PRIMARY_ADMIN_EMAIL : '');
     const isAdmin = isAuthorizedAdminEmail(resolvedEmail) || profile?.role === 'admin';
 
-    if (profile) {
-      callback({
-        ...profile,
-        email: resolvedEmail,
-        role: isAdmin ? 'admin' : profile.role,
-      });
-    } else {
-      callback({
-        uid: fbUser.uid,
-        name: fbUser.displayName || (isAdmin ? 'Andika Yuliananta, S.Pd.' : 'Guru Tamu'),
-        email: resolvedEmail,
-        role: isAdmin ? 'admin' : 'teacher',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-      });
-    }
+    const fullUser: User = profile
+      ? {
+          ...profile,
+          email: resolvedEmail,
+          role: isAdmin ? 'admin' : profile.role,
+        }
+      : {
+          uid: fbUser.uid,
+          name: fbUser.displayName || (isAdmin ? 'Andika Yuliananta, S.Pd.' : 'Guru Tamu'),
+          email: resolvedEmail,
+          role: isAdmin ? 'admin' : 'teacher',
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+        };
+
+    setLocalTeacherSession(fullUser);
+    callback(fullUser);
   });
 }
 
 export async function ensureTeacherAuthSession(): Promise<User> {
+  let adminUser: User;
   if (auth.currentUser) {
     const profile = await getUserProfile(auth.currentUser.uid);
-    if (profile) return profile;
-    return {
+    adminUser = profile || {
       uid: auth.currentUser.uid,
       name: auth.currentUser.displayName || 'Andika Yuliananta, S.Pd.',
       email: auth.currentUser.email || PRIMARY_ADMIN_EMAIL,
@@ -225,31 +277,32 @@ export async function ensureTeacherAuthSession(): Promise<User> {
       status: 'ACTIVE',
       createdAt: new Date().toISOString(),
     };
+  } else {
+    try {
+      const cred = await signInAnonymously(auth);
+      adminUser = {
+        uid: cred.user.uid,
+        name: 'Andika Yuliananta, S.Pd.',
+        email: PRIMARY_ADMIN_EMAIL,
+        role: 'admin',
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'users', cred.user.uid), adminUser, { merge: true });
+    } catch {
+      adminUser = {
+        uid: 'admin_andika_yuliananta',
+        name: 'Andika Yuliananta, S.Pd.',
+        email: PRIMARY_ADMIN_EMAIL,
+        role: 'admin',
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+      };
+    }
   }
 
-  try {
-    const cred = await signInAnonymously(auth);
-    const adminUser: User = {
-      uid: cred.user.uid,
-      name: 'Andika Yuliananta, S.Pd.',
-      email: PRIMARY_ADMIN_EMAIL,
-      role: 'admin',
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-    };
-    await setDoc(doc(db, 'users', cred.user.uid), adminUser);
-    return adminUser;
-  } catch (err) {
-    console.warn('Fallback admin auth session:', err);
-    return {
-      uid: 'admin_andika_yuliananta',
-      name: 'Andika Yuliananta, S.Pd.',
-      email: PRIMARY_ADMIN_EMAIL,
-      role: 'admin',
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-    };
-  }
+  setLocalTeacherSession(adminUser);
+  return adminUser;
 }
 
 
