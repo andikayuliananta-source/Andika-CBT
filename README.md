@@ -104,6 +104,21 @@ Hasil build akan tersimpan di dalam direktori `dist/`.
 
 ---
 
+## 🔐 Konfigurasi Firebase 'Authorized Domains' (Login Google)
+
+Agar fitur **Masuk via Akun Google** (`andika.yuliananta@gmail.com`) bekerja tanpa kendala `auth/unauthorized-domain`:
+
+1. Buka [Firebase Console &rarr; Authentication &rarr; Settings](https://console.firebase.google.com/project/dark-karst-5xctm/authentication/settings).
+2. Gulir ke bagian **Authorized domains** (Domain resmi).
+3. Klik **Add domain** lalu masukkan domain deployment Anda:
+   - `ais-dev-xzuiq6p4u3ojuffsggndvw-857154047210.asia-southeast1.run.app` (Dev URL)
+   - `ais-pre-xzuiq6p4u3ojuffsggndvw-857154047210.asia-southeast1.run.app` (Shared URL)
+   - Domain kustom Anda (misal `cbt.sekolah.sch.id` atau domain hosting Vercel/Netlify).
+4. Klik **Save**.
+5. Panduan lengkap dan langkah detail tersedia di berkas [`docs/PANDUAN_AUTHORIZED_DOMAINS.md`](./docs/PANDUAN_AUTHORIZED_DOMAINS.md).
+
+---
+
 ## 📂 Struktur Direktori
 
 ```plaintext
