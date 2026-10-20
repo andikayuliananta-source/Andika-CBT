@@ -55,6 +55,8 @@ import {
   getAllLocalDrafts,
   saveAutosaveSnapshot,
   getAutosaveSnapshot,
+  parseStatementAnswers,
+  serializeStatementAnswers,
 } from '../../services/firebase/examService';
 import {
   requestAppFullscreen,
@@ -729,6 +731,57 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
     }, 1800);
   };
 
+  const handleSelectStatementOption = async (statementId: string, choice: 'B' | 'S') => {
+    if (!currentQuestion || isSubmitting) return;
+
+    if (savingTimeoutRef.current) {
+      clearTimeout(savingTimeoutRef.current);
+      savingTimeoutRef.current = null;
+    }
+
+    const currentMap = parseStatementAnswers(currentAnswer);
+    const updatedMap = {
+      ...currentMap,
+      [statementId]: choice,
+    };
+    const nextAnswer = serializeStatementAnswers(updatedMap);
+
+    const newAnswers = {
+      ...answers,
+      [currentQuestion.questionId]: {
+        answer: nextAnswer,
+        marked: currentMarked,
+      },
+    };
+    setAnswers(newAnswers);
+
+    // 1. Instant save draft in-memory and debounced flush
+    saveAnswerDraftLocally(
+      participant.participantId,
+      exam.examId,
+      currentQuestion.questionId,
+      nextAnswer,
+      currentMarked
+    );
+    persistAnswersToLocalStorage(newAnswers, currentIndex, false);
+
+    const nowTime = new Date().toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    setLastSavedTime(nowTime);
+    setAnswerSavingStatus('saved');
+
+    // 2. Debounced background sync to Firestore
+    queueAnswerSync(currentQuestion.questionId, nextAnswer, currentMarked);
+
+    savingTimeoutRef.current = setTimeout(() => {
+      setAnswerSavingStatus(null);
+      savingTimeoutRef.current = null;
+    }, 1800);
+  };
+
   const handleToggleMark = async () => {
     if (!currentQuestion || isSubmitting) return;
 
@@ -848,7 +901,7 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
 
   // Counts
   const answeredCount = Object.values(answers).filter(
-    (a: { answer: string; marked: boolean }) => a.answer !== ''
+    (a: { answer: string; marked: boolean }) => a.answer !== '' && a.answer !== '{}'
   ).length;
   const markedCount = Object.values(answers).filter(
     (a: { answer: string; marked: boolean }) => a.marked
@@ -1227,7 +1280,7 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
               <QuestionChip
                 key={q.questionId}
                 index={idx}
-                isAnswered={Boolean(ansState?.answer && ansState.answer !== '')}
+                isAnswered={Boolean(ansState?.answer && ansState.answer !== '' && ansState.answer !== '{}')}
                 isMarked={Boolean(ansState?.marked)}
                 isActive={idx === currentIndex}
                 onClick={() => handleNavigateQuestion(idx)}
@@ -1396,6 +1449,7 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
             fontSize={fontSize}
             onChangeFontSize={setFontSize}
             onSelectOption={handleSelectOption}
+            onSelectStatementOption={handleSelectStatementOption}
             onToggleMark={handleToggleMark}
             onJumpToNextMarked={handleJumpToNextMarkedQuestion}
             markedCount={markedCount}
@@ -1451,7 +1505,7 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
                 <QuestionChip
                   key={q.questionId}
                   index={idx}
-                  isAnswered={Boolean(ansState?.answer && ansState.answer !== '')}
+                  isAnswered={Boolean(ansState?.answer && ansState.answer !== '' && ansState.answer !== '{}')}
                   isMarked={Boolean(ansState?.marked)}
                   isActive={idx === currentIndex}
                   onClick={() => handleNavigateQuestion(idx)}
@@ -1640,7 +1694,7 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
                   <QuestionChip
                     key={q.questionId}
                     index={idx}
-                    isAnswered={Boolean(ansState?.answer && ansState.answer !== '')}
+                    isAnswered={Boolean(ansState?.answer && ansState.answer !== '' && ansState.answer !== '{}')}
                     isMarked={Boolean(ansState?.marked)}
                     isActive={idx === currentIndex}
                     onClick={() => {

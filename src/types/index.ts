@@ -6,7 +6,18 @@ export type SubmitReason = 'NORMAL' | 'TIMEOUT' | 'TAB_SWITCH' | 'TAB_CLOSED';
 export type ResultPassStatus = 'LULUS' | 'BELUM LULUS';
 export type GradeLevel = '1' | '2' | '3' | '4' | '5' | '6';
 export type CurriculumPhase = 'A' | 'B' | 'C';
-export type QuestionType = 'SINGLE' | 'COMPLEX'; // SINGLE = Pilihan Ganda Biasa, COMPLEX = Pilihan Ganda Kompleks
+export type QuestionType = 'SINGLE' | 'COMPLEX' | 'COMPLEX_TF'; // SINGLE = PG Biasa, COMPLEX = PG Kompleks (Multi-Opsi), COMPLEX_TF = PG Kompleks (Pernyataan Benar/Salah)
+
+export interface QuestionStatement {
+  id: string; // e.g. "s1", "s2", "s3"
+  text: string;
+  isCorrectTrue: boolean; // true = Benar, false = Salah
+}
+
+export interface StudentSafeStatement {
+  id: string;
+  text: string;
+}
 
 export interface User {
   uid: string;
@@ -45,11 +56,12 @@ export interface Question {
   number: number;
   question: string;
   imageUrl?: string;
-  type?: QuestionType; // 'SINGLE' (default) | 'COMPLEX'
+  type?: QuestionType; // 'SINGLE' (default) | 'COMPLEX' | 'COMPLEX_TF'
   optionA: string;
   optionB: string;
   optionC?: string;
   optionD?: string;
+  statements?: QuestionStatement[]; // For COMPLEX_TF: array of statements with Benar/Salah keys
   correctAnswer: 'A' | 'B' | 'C' | 'D'; // Primary or single answer
   correctAnswers?: ('A' | 'B' | 'C' | 'D')[]; // Multiple correct answers for 'COMPLEX'
   weight: number;
@@ -70,6 +82,7 @@ export interface StudentSafeQuestion {
   optionB: string;
   optionC?: string;
   optionD?: string;
+  statements?: StudentSafeStatement[]; // Omit isCorrectTrue for test integrity
   weight: number;
 }
 

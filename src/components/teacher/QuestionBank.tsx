@@ -23,8 +23,9 @@ import {
   Lightbulb,
   ChevronDown,
   ChevronUp,
+  Table,
 } from 'lucide-react';
-import { Exam, Question, QuestionType } from '../../types';
+import { Exam, Question, QuestionType, QuestionStatement } from '../../types';
 import {
   getQuestions,
   addQuestion,
@@ -71,12 +72,20 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
   const [optionD, setOptionD] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [correctAnswersComplex, setCorrectAnswersComplex] = useState<('A' | 'B' | 'C' | 'D')[]>(['A']);
+  const [statements, setStatements] = useState<QuestionStatement[]>([
+    { id: 's1', text: '', isCorrectTrue: true },
+    { id: 's2', text: '', isCorrectTrue: false },
+    { id: 's3', text: '', isCorrectTrue: true },
+  ]);
+  const [activeStatementIndex, setActiveStatementIndex] = useState<number | null>(null);
   const [weight, setWeight] = useState(20);
   const [explanation, setExplanation] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showMathGuide, setShowMathGuide] = useState(true);
-  const [activeField, setActiveField] = useState<'question' | 'optionA' | 'optionB' | 'optionC' | 'optionD' | 'explanation'>('question');
+  const [activeField, setActiveField] = useState<
+    'question' | 'optionA' | 'optionB' | 'optionC' | 'optionD' | 'explanation' | 'statement'
+  >('question');
 
   // Check if any field contains raw LaTeX code
   const detectedLatex =
@@ -85,7 +94,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     hasLatexCode(optionB) ||
     hasLatexCode(optionC) ||
     hasLatexCode(optionD) ||
-    hasLatexCode(explanation);
+    hasLatexCode(explanation) ||
+    statements.some((s) => hasLatexCode(s.text));
 
   // Insert standard math symbol or formula into the currently focused field
   const handleInsertMathSymbol = (sym: string) => {
@@ -101,6 +111,12 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
       setOptionD((prev) => prev + sym);
     } else if (activeField === 'explanation') {
       setExplanation((prev) => prev + sym);
+    } else if (activeField === 'statement' && activeStatementIndex !== null) {
+      setStatements((prev) =>
+        prev.map((s, idx) =>
+          idx === activeStatementIndex ? { ...s, text: s.text + sym } : s
+        )
+      );
     }
   };
 
@@ -112,6 +128,12 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     setOptionC((prev) => (prev ? convertLatexToStandardMath(prev) : ''));
     setOptionD((prev) => (prev ? convertLatexToStandardMath(prev) : ''));
     setExplanation((prev) => (prev ? convertLatexToStandardMath(prev) : ''));
+    setStatements((prev) =>
+      prev.map((s) => ({
+        ...s,
+        text: convertLatexToStandardMath(s.text),
+      }))
+    );
   };
 
   // Refresh questions for current exam
@@ -223,6 +245,12 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     setOptionD('');
     setCorrectAnswer('A');
     setCorrectAnswersComplex(['A']);
+    setStatements([
+      { id: 's1', text: '', isCorrectTrue: true },
+      { id: 's2', text: '', isCorrectTrue: false },
+      { id: 's3', text: '', isCorrectTrue: true },
+    ]);
+    setActiveStatementIndex(null);
     setWeight(20);
     setExplanation('');
     setIsModalOpen(true);
@@ -230,8 +258,17 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
 
   const openEditModal = (q: Question) => {
     setEditingQuestion(q);
+    const isCompTF = q.type === 'COMPLEX_TF' || (Array.isArray(q.statements) && q.statements.length > 0);
     const isComp = q.type === 'COMPLEX' || (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 1);
-    setQuestionType(isComp ? 'COMPLEX' : 'SINGLE');
+    
+    if (isCompTF) {
+      setQuestionType('COMPLEX_TF');
+    } else if (isComp) {
+      setQuestionType('COMPLEX');
+    } else {
+      setQuestionType('SINGLE');
+    }
+
     setQuestionText(typeof q.question === 'string' ? q.question : String(q.question || ''));
     
     const safeImg = typeof q.imageUrl === 'string' ? q.imageUrl : '';
@@ -263,6 +300,24 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
         ? q.correctAnswers
         : [q.correctAnswer || 'A']
     );
+
+    if (q.statements && Array.isArray(q.statements) && q.statements.length > 0) {
+      setStatements(
+        q.statements.map((s, idx) => ({
+          id: s.id || `s${idx + 1}`,
+          text: typeof s.text === 'string' ? s.text : String(s.text || ''),
+          isCorrectTrue: typeof s.isCorrectTrue === 'boolean' ? s.isCorrectTrue : true,
+        }))
+      );
+    } else {
+      setStatements([
+        { id: 's1', text: '', isCorrectTrue: true },
+        { id: 's2', text: '', isCorrectTrue: false },
+        { id: 's3', text: '', isCorrectTrue: true },
+      ]);
+    }
+    setActiveStatementIndex(null);
+
     setWeight(q.weight || 20);
     setExplanation(typeof q.explanation === 'string' ? q.explanation : '');
     setIsModalOpen(true);
@@ -278,61 +333,126 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     });
   };
 
+  const handleAddStatement = () => {
+    if (statements.length >= 8) {
+      alert('Maksimal 8 pernyataan per butir soal.');
+      return;
+    }
+    const nextNum = statements.length + 1;
+    const nextId = `s_${Date.now()}_${nextNum}`;
+    setStatements((prev) => [...prev, { id: nextId, text: '', isCorrectTrue: true }]);
+  };
+
+  const handleRemoveStatement = (index: number) => {
+    if (statements.length <= 2) {
+      alert('Pilihan ganda kompleks model pernyataan minimal harus memiliki 2 pernyataan.');
+      return;
+    }
+    setStatements((prev) => prev.filter((_, idx) => idx !== index));
+    if (activeStatementIndex === index) {
+      setActiveStatementIndex(null);
+      setActiveField('question');
+    }
+  };
+
+  const handleUpdateStatementText = (index: number, text: string) => {
+    setStatements((prev) =>
+      prev.map((s, idx) => (idx === index ? { ...s, text } : s))
+    );
+  };
+
+  const handleToggleStatementKey = (index: number, isCorrectTrue: boolean) => {
+    setStatements((prev) =>
+      prev.map((s, idx) => (idx === index ? { ...s, isCorrectTrue } : s))
+    );
+  };
+
   const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!questionText.trim() || !optionA.trim() || !optionB.trim()) {
-      alert('Pertanyaan dan minimal pilihan A & B harus diisi!');
+    if (!questionText.trim()) {
+      alert('Teks pertanyaan harus diisi!');
       return;
     }
 
-    if (questionType === 'COMPLEX' && correctAnswersComplex.length === 0) {
-      alert('Untuk Pilihan Ganda Kompleks, pilih minimal 1 kunci jawaban yang benar!');
-      return;
+    if (questionType === 'COMPLEX_TF') {
+      if (statements.length < 2) {
+        alert('Untuk Pilihan Ganda Kompleks (Benar/Salah), minimal harus ada 2 pernyataan!');
+        return;
+      }
+      const hasEmptyStatement = statements.some((s) => !s.text.trim());
+      if (hasEmptyStatement) {
+        alert('Semua teks pernyataan harus diisi!');
+        return;
+      }
+    } else {
+      if (!optionA.trim() || !optionB.trim()) {
+        alert('Pertanyaan dan minimal pilihan A & B harus diisi!');
+        return;
+      }
+      if (questionType === 'COMPLEX' && correctAnswersComplex.length === 0) {
+        alert('Untuk Pilihan Ganda Kompleks, pilih minimal 1 kunci jawaban yang benar!');
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
       const sortedComplex = [...correctAnswersComplex].sort();
-      const primaryAnswer = questionType === 'COMPLEX' ? (sortedComplex[0] || 'A') : correctAnswer;
+      const primaryAnswer =
+        questionType === 'COMPLEX_TF'
+          ? 'A'
+          : questionType === 'COMPLEX'
+          ? sortedComplex[0] || 'A'
+          : correctAnswer;
 
       // Automatically convert any LaTeX formatting into clean web CBT standard text
       const cleanQuestion = convertLatexToStandardMath(questionText.trim());
-      const cleanOptionA = convertLatexToStandardMath(optionA.trim());
-      const cleanOptionB = convertLatexToStandardMath(optionB.trim());
-      const cleanOptionC = optionC.trim() ? convertLatexToStandardMath(optionC.trim()) : '';
-      const cleanOptionD = optionD.trim() ? convertLatexToStandardMath(optionD.trim()) : '';
       const cleanExplanation = explanation.trim() ? convertLatexToStandardMath(explanation.trim()) : '';
 
       const payload: Omit<Question, 'questionId' | 'examId' | 'createdAt' | 'updatedAt'> = {
         number: editingQuestion ? editingQuestion.number : questions.length + 1,
         question: cleanQuestion,
         type: questionType,
-        optionA: cleanOptionA,
-        optionB: cleanOptionB,
+        optionA: questionType === 'COMPLEX_TF' ? 'Benar' : convertLatexToStandardMath(optionA.trim()),
+        optionB: questionType === 'COMPLEX_TF' ? 'Salah' : convertLatexToStandardMath(optionB.trim()),
         correctAnswer: primaryAnswer,
         weight: Number(weight) || 1,
       };
 
-      if (questionType === 'COMPLEX') {
+      if (questionType === 'COMPLEX_TF') {
+        payload.statements = statements.map((s, idx) => ({
+          id: s.id || `s${idx + 1}`,
+          text: convertLatexToStandardMath(s.text.trim()),
+          isCorrectTrue: Boolean(s.isCorrectTrue),
+        }));
+      } else if (questionType === 'COMPLEX') {
         payload.correctAnswers = sortedComplex;
+      }
+
+      if (questionType !== 'COMPLEX_TF') {
+        const cleanOptionC = optionC.trim() ? convertLatexToStandardMath(optionC.trim()) : '';
+        const cleanOptionD = optionD.trim() ? convertLatexToStandardMath(optionD.trim()) : '';
+
+        if (cleanOptionC) {
+          payload.optionC = cleanOptionC;
+        } else if (editingQuestion) {
+          payload.optionC = '';
+        }
+
+        if (cleanOptionD) {
+          payload.optionD = cleanOptionD;
+        } else if (editingQuestion) {
+          payload.optionD = '';
+        }
+      } else if (editingQuestion) {
+        payload.optionC = '';
+        payload.optionD = '';
       }
 
       if (imageUrl.trim()) {
         payload.imageUrl = imageUrl.trim();
       } else if (editingQuestion) {
         payload.imageUrl = '';
-      }
-
-      if (cleanOptionC) {
-        payload.optionC = cleanOptionC;
-      } else if (editingQuestion) {
-        payload.optionC = '';
-      }
-
-      if (cleanOptionD) {
-        payload.optionD = cleanOptionD;
-      } else if (editingQuestion) {
-        payload.optionD = '';
       }
 
       if (cleanExplanation) {
@@ -381,6 +501,9 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
       };
       if (q.type === 'COMPLEX' && q.correctAnswers) {
         dupPayload.correctAnswers = q.correctAnswers;
+      }
+      if (q.type === 'COMPLEX_TF' && q.statements) {
+        dupPayload.statements = q.statements.map((s) => ({ ...s }));
       }
       if (q.imageUrl) dupPayload.imageUrl = q.imageUrl;
       if (q.optionC) dupPayload.optionC = q.optionC;
@@ -467,7 +590,12 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                   <span className="font-display font-extrabold text-sm text-slate-800 bg-slate-100 px-3 py-1 rounded-xl">
                     Nomor {idx + 1}
                   </span>
-                  {q.type === 'COMPLEX' ? (
+                  {q.type === 'COMPLEX_TF' ? (
+                    <span className="text-[11px] font-extrabold text-teal-800 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-xl flex items-center space-x-1">
+                      <Table className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <span>PG Kompleks (Pernyataan B/S)</span>
+                    </span>
+                  ) : q.type === 'COMPLEX' ? (
                     <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl flex items-center space-x-1">
                       <ListChecks className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                       <span>PG Kompleks</span>
@@ -486,21 +614,21 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                   <button
                     onClick={() => handleDuplicate(q)}
                     title="Duplikasi Soal"
-                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => openEditModal(q)}
                     title="Edit Soal"
-                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(q.questionId)}
                     title="Hapus Soal"
-                    className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -522,54 +650,97 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                 />
               )}
 
-              {/* Options list */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
-                {(['A', 'B', 'C', 'D'] as const).map((key) => {
-                  const rawVal =
-                    key === 'A'
-                      ? q.optionA
-                      : key === 'B'
-                      ? q.optionB
-                      : key === 'C'
-                      ? q.optionC
-                      : q.optionD;
-
-                  const val = typeof rawVal === 'string' ? rawVal : (rawVal ? String(rawVal) : '');
-
-                  if (!val && (key === 'C' || key === 'D')) return null;
-
-                  const isComplex = q.type === 'COMPLEX' || (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 1);
-                  const isCorrect = isComplex
-                    ? (Array.isArray(q.correctAnswers) ? q.correctAnswers : [q.correctAnswer]).includes(key)
-                    : q.correctAnswer === key;
-
-                  return (
+              {/* Options list / Statements list */}
+              {q.type === 'COMPLEX_TF' && Array.isArray(q.statements) && q.statements.length > 0 ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-200">
+                  <div className="bg-slate-100/80 px-4 py-2 flex items-center justify-between text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
+                    <span>Daftar Pernyataan Soal</span>
+                    <span>Kunci Jawaban</span>
+                  </div>
+                  {q.statements.map((stmt, sIdx) => (
                     <div
-                      key={key}
-                      className={`p-2.5 rounded-xl border flex items-center space-x-2.5 ${
-                        isCorrect
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
-                          : 'bg-slate-50/60 border-slate-200'
-                      }`}
+                      key={stmt.id || sIdx}
+                      className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                     >
+                      <div className="flex items-start space-x-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5 sm:mt-0">
+                          {sIdx + 1}
+                        </span>
+                        <span className="font-semibold text-slate-800 leading-snug">
+                          {stmt.text}
+                        </span>
+                      </div>
                       <span
-                        className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
-                          isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                        className={`inline-flex items-center space-x-1 px-3 py-1 rounded-xl text-xs font-black uppercase shrink-0 self-start sm:self-auto ${
+                          stmt.isCorrectTrue
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-rose-100 text-rose-800 border border-rose-300'
                         }`}
                       >
-                        {key}
+                        {stmt.isCorrectTrue ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600" />
+                            <span>Benar</span>
+                          </>
+                        ) : (
+                          <>
+                            <X className="w-3.5 h-3.5 stroke-[3] text-rose-600" />
+                            <span>Salah</span>
+                          </>
+                        )}
                       </span>
-                      <span className="truncate">{val}</span>
-                      {isCorrect && (
-                        <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded ml-auto font-black uppercase flex items-center space-x-1">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                          <span>Kunci</span>
-                        </span>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
+                  {(['A', 'B', 'C', 'D'] as const).map((key) => {
+                    const rawVal =
+                      key === 'A'
+                        ? q.optionA
+                        : key === 'B'
+                        ? q.optionB
+                        : key === 'C'
+                        ? q.optionC
+                        : q.optionD;
+
+                    const val = typeof rawVal === 'string' ? rawVal : (rawVal ? String(rawVal) : '');
+
+                    if (!val && (key === 'C' || key === 'D')) return null;
+
+                    const isComplex = q.type === 'COMPLEX' || (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 1);
+                    const isCorrect = isComplex
+                      ? (Array.isArray(q.correctAnswers) ? q.correctAnswers : [q.correctAnswer]).includes(key)
+                      : q.correctAnswer === key;
+
+                    return (
+                      <div
+                        key={key}
+                        className={`p-2.5 rounded-xl border flex items-center space-x-2.5 ${
+                          isCorrect
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold'
+                            : 'bg-slate-50/60 border-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
+                            isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {key}
+                        </span>
+                        <span className="truncate">{val}</span>
+                        {isCorrect && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded ml-auto font-black uppercase flex items-center space-x-1">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>Kunci</span>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Explanation if any */}
               {q.explanation && typeof q.explanation === 'string' && q.explanation.trim() && (
@@ -606,37 +777,52 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                     Model Input Soal
                   </label>
                   <span className="text-[11px] text-slate-500 font-medium">
-                    {questionType === 'COMPLEX'
-                      ? 'Pilihan ganda kompleks (bisa memilih lebih dari 1 kunci jawaban benar)'
-                      : 'Pilihan ganda biasa (hanya 1 kunci jawaban benar)'}
+                    {questionType === 'COMPLEX_TF'
+                      ? 'Pilihan ganda kompleks pernyataan (siswa menjawab tiap pernyataan Benar atau Salah)'
+                      : questionType === 'COMPLEX'
+                      ? 'Pilihan ganda kompleks multi-jawaban (memilih lebih dari 1 opsi yang benar)'
+                      : 'Pilihan ganda biasa (hanya 1 opsi jawaban yang benar)'}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
                   <button
                     type="button"
                     onClick={() => setQuestionType('SINGLE')}
-                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center space-x-2 border-2 transition-all cursor-pointer ${
+                    className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer text-xs ${
                       questionType === 'SINGLE'
                         ? 'bg-amber-500 border-amber-600 text-white shadow-xs'
                         : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                     }`}
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Pilihan Ganda Biasa</span>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>PG Biasa</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setQuestionType('COMPLEX')}
-                    className={`py-2 px-3 rounded-xl font-bold flex items-center justify-center space-x-2 border-2 transition-all cursor-pointer ${
+                    className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer text-xs ${
                       questionType === 'COMPLEX'
                         ? 'bg-indigo-600 border-indigo-700 text-white shadow-xs'
                         : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                     }`}
                   >
-                    <ListChecks className="w-4 h-4" />
-                    <span>Pilihan Ganda Kompleks</span>
+                    <ListChecks className="w-4 h-4 shrink-0" />
+                    <span>PG Kompleks</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setQuestionType('COMPLEX_TF')}
+                    className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer text-xs ${
+                      questionType === 'COMPLEX_TF'
+                        ? 'bg-teal-600 border-teal-700 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <Table className="w-4 h-4 shrink-0" />
+                    <span>PG Kompleks (B/S)</span>
                   </button>
                 </div>
               </div>
@@ -741,7 +927,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                          activeField === 'optionA' ? 'Pilihan A' :
                          activeField === 'optionB' ? 'Pilihan B' :
                          activeField === 'optionC' ? 'Pilihan C' :
-                         activeField === 'optionD' ? 'Pilihan D' : 'Pembahasan'}
+                         activeField === 'optionD' ? 'Pilihan D' :
+                         activeField === 'statement' ? `Pernyataan #${(activeStatementIndex ?? 0) + 1}` : 'Pembahasan'}
                       </span>
                     </span>
                     <span className="text-[10px] text-slate-400">Klik tombol untuk langsung menyisipkan rumus</span>
@@ -1186,188 +1373,310 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                 )}
               </div>
 
-              {/* Options Inputs */}
-              <div className="space-y-2.5">
-                <label className="block text-slate-700 font-bold uppercase">
-                  Pilihan Jawaban
-                </label>
-
-                {/* Pilihan A */}
-                <div className="flex items-center space-x-2">
-                  <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
-                    A
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    value={optionA}
-                    onFocus={() => setActiveField('optionA')}
-                    onChange={(e) => setOptionA(e.target.value)}
-                    placeholder="Pilihan A (contoh: 3/8 atau 144 cm²)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
-                  />
-                </div>
-
-                {/* Pilihan B */}
-                <div className="flex items-center space-x-2">
-                  <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
-                    B
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    value={optionB}
-                    onFocus={() => setActiveField('optionB')}
-                    onChange={(e) => setOptionB(e.target.value)}
-                    placeholder="Pilihan B (contoh: 5/8 atau 100 cm²)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
-                  />
-                </div>
-
-                {/* Pilihan C */}
-                <div className="flex items-center space-x-2">
-                  <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
-                    C
-                  </span>
-                  <input
-                    type="text"
-                    value={optionC}
-                    onFocus={() => setActiveField('optionC')}
-                    onChange={(e) => setOptionC(e.target.value)}
-                    placeholder="Pilihan C (opsional untuk benar/salah)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
-                  />
-                </div>
-
-                {/* Pilihan D */}
-                <div className="flex items-center space-x-2">
-                  <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
-                    D
-                  </span>
-                  <input
-                    type="text"
-                    value={optionD}
-                    onFocus={() => setActiveField('optionD')}
-                    onChange={(e) => setOptionD(e.target.value)}
-                    placeholder="Pilihan D (opsional)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
-                  />
-                </div>
-              </div>
-
-              {/* Kunci Jawaban & Bobot */}
-              {questionType === 'SINGLE' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-700 font-bold uppercase mb-1">
-                      Kunci Jawaban Benar
-                    </label>
-                    <select
-                      value={correctAnswer}
-                      onChange={(e) => setCorrectAnswer(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-950 font-black focus:outline-none"
+              {/* Options or Statements Section based on Model Input Soal */}
+              {questionType === 'COMPLEX_TF' ? (
+                /* Statements (Benar / Salah) Builder */
+                <div className="space-y-3 bg-teal-50/50 p-4 rounded-2xl border-2 border-teal-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-teal-200/80 pb-3">
+                    <div>
+                      <h4 className="font-display font-black text-teal-950 text-xs sm:text-sm uppercase tracking-wide flex items-center space-x-1.5">
+                        <Table className="w-4 h-4 text-teal-700" />
+                        <span>Daftar Pernyataan & Kunci Jawaban (Benar / Salah)</span>
+                      </h4>
+                      <p className="text-[11px] text-teal-800 font-medium">
+                        Tuliskan pernyataan pada setiap baris dan tentukan kunci jawabannya apakah <strong>Benar (B)</strong> atau <strong>Salah (S)</strong>.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddStatement}
+                      className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-1 shrink-0 self-start sm:self-auto cursor-pointer"
                     >
-                      <option value="A">Pilihan A</option>
-                      <option value="B">Pilihan B</option>
-                      <option value="C">Pilihan C</option>
-                      <option value="D">Pilihan D</option>
-                    </select>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Tambah Pernyataan</span>
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold uppercase mb-1">
-                      Bobot Nilai Soal
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      required
-                      value={weight}
-                      onChange={(e) => setWeight(Number(e.target.value))}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none font-bold"
-                    />
+                  <div className="space-y-2.5">
+                    {statements.map((stmt, idx) => (
+                      <div
+                        key={stmt.id || idx}
+                        className="bg-white p-3 rounded-xl border border-teal-200/90 shadow-2xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-teal-900 text-xs flex items-center space-x-1.5">
+                            <span className="w-5 h-5 rounded-md bg-teal-100 text-teal-800 flex items-center justify-center text-[11px] font-black">
+                              {idx + 1}
+                            </span>
+                            <span>Pernyataan {idx + 1}</span>
+                          </span>
+
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase hidden xs:inline">
+                              Kunci:
+                            </span>
+                            <div className="inline-flex rounded-lg p-0.5 bg-slate-100 border border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStatementKey(idx, true)}
+                                className={`px-2.5 py-1 rounded-md text-xs font-black transition-all flex items-center space-x-1 cursor-pointer ${
+                                  stmt.isCorrectTrue
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'text-slate-600 hover:text-emerald-700'
+                                }`}
+                              >
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>Benar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStatementKey(idx, false)}
+                                className={`px-2.5 py-1 rounded-md text-xs font-black transition-all flex items-center space-x-1 cursor-pointer ${
+                                  !stmt.isCorrectTrue
+                                    ? 'bg-rose-600 text-white shadow-xs'
+                                    : 'text-slate-600 hover:text-rose-700'
+                                }`}
+                              >
+                                <X className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>Salah</span>
+                              </button>
+                            </div>
+
+                            {statements.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveStatement(idx)}
+                                title="Hapus baris pernyataan ini"
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <textarea
+                          rows={2}
+                          required
+                          value={stmt.text}
+                          onFocus={() => {
+                            setActiveField('statement');
+                            setActiveStatementIndex(idx);
+                          }}
+                          onChange={(e) => handleUpdateStatementText(idx, e.target.value)}
+                          placeholder={`Tuliskan pernyataan ${idx + 1}... (contoh: Kubus memiliki 6 sisi berbentuk persegi kongruen)`}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-teal-500 font-medium text-xs"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-teal-200/60">
+                    <p className="text-[11px] text-teal-850 font-medium">
+                      * Siswa akan menjawab tiap baris pernyataan dengan memilih <strong>Benar</strong> atau <strong>Salah</strong>.
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-slate-700 font-bold uppercase text-xs whitespace-nowrap">
+                        Bobot Nilai:
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        required
+                        value={weight}
+                        onChange={(e) => setWeight(Number(e.target.value))}
+                        className="w-24 px-3 py-1.5 bg-white border border-teal-300 rounded-xl text-slate-900 focus:outline-none font-black text-xs"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <div>
-                      <label className="block text-indigo-950 font-black uppercase text-[11px] tracking-wide">
-                        Kunci Jawaban Benar (Pilihan Ganda Kompleks)
-                      </label>
-                      <p className="text-[11px] text-indigo-800/80 font-semibold">
-                        Centang semua pilihan yang merupakan jawaban benar (bisa 2 atau lebih).
-                      </p>
+                <>
+                  {/* Options Inputs */}
+                  <div className="space-y-2.5">
+                    <label className="block text-slate-700 font-bold uppercase">
+                      Pilihan Jawaban
+                    </label>
+
+                    {/* Pilihan A */}
+                    <div className="flex items-center space-x-2">
+                      <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
+                        A
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        value={optionA}
+                        onFocus={() => setActiveField('optionA')}
+                        onChange={(e) => setOptionA(e.target.value)}
+                        placeholder="Pilihan A (contoh: 3/8 atau 144 cm²)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
+                      />
                     </div>
-                    <span className="text-[11px] font-extrabold text-indigo-900 bg-indigo-100/90 border border-indigo-200 px-2.5 py-0.5 rounded-lg shrink-0 self-start sm:self-auto">
-                      Kunci: {correctAnswersComplex.length > 0 ? correctAnswersComplex.join(', ') : 'Belum dipilih'}
-                    </span>
+
+                    {/* Pilihan B */}
+                    <div className="flex items-center space-x-2">
+                      <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
+                        B
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        value={optionB}
+                        onFocus={() => setActiveField('optionB')}
+                        onChange={(e) => setOptionB(e.target.value)}
+                        placeholder="Pilihan B (contoh: 5/8 atau 100 cm²)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
+                      />
+                    </div>
+
+                    {/* Pilihan C */}
+                    <div className="flex items-center space-x-2">
+                      <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
+                        C
+                      </span>
+                      <input
+                        type="text"
+                        value={optionC}
+                        onFocus={() => setActiveField('optionC')}
+                        onChange={(e) => setOptionC(e.target.value)}
+                        placeholder="Pilihan C (opsional untuk benar/salah)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
+                      />
+                    </div>
+
+                    {/* Pilihan D */}
+                    <div className="flex items-center space-x-2">
+                      <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
+                        D
+                      </span>
+                      <input
+                        type="text"
+                        value={optionD}
+                        onFocus={() => setActiveField('optionD')}
+                        onChange={(e) => setOptionD(e.target.value)}
+                        placeholder="Pilihan D (opsional)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
+                      />
+                    </div>
                   </div>
 
-                  {/* Complex checkboxes */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {(['A', 'B', 'C', 'D'] as const).map((key) => {
-                      const isChecked = correctAnswersComplex.includes(key);
-                      const optLabel =
-                        key === 'A'
-                          ? optionA
-                          : key === 'B'
-                          ? optionB
-                          : key === 'C'
-                          ? optionC
-                          : optionD;
-
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => toggleComplexOption(key)}
-                          className={`p-2.5 rounded-xl border-2 font-bold flex items-center justify-between transition-all cursor-pointer select-none text-left ${
-                            isChecked
-                              ? 'bg-emerald-500 border-emerald-600 text-white shadow-xs'
-                              : 'bg-white border-indigo-200 text-slate-700 hover:border-indigo-400 hover:bg-indigo-50/40'
-                          }`}
+                  {/* Kunci Jawaban & Bobot */}
+                  {questionType === 'SINGLE' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-700 font-bold uppercase mb-1">
+                          Kunci Jawaban Benar
+                        </label>
+                        <select
+                          value={correctAnswer}
+                          onChange={(e) => setCorrectAnswer(e.target.value as any)}
+                          className="w-full px-3.5 py-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-950 font-black focus:outline-none"
                         >
-                          <div className="flex items-center space-x-2 min-w-0">
-                            <span
-                              className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
+                          <option value="A">Pilihan A</option>
+                          <option value="B">Pilihan B</option>
+                          <option value="C">Pilihan C</option>
+                          <option value="D">Pilihan D</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-700 font-bold uppercase mb-1">
+                          Bobot Nilai Soal
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          required
+                          value={weight}
+                          onChange={(e) => setWeight(Number(e.target.value))}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none font-bold"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-200">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div>
+                          <label className="block text-indigo-950 font-black uppercase text-[11px] tracking-wide">
+                            Kunci Jawaban Benar (Pilihan Ganda Kompleks)
+                          </label>
+                          <p className="text-[11px] text-indigo-800/80 font-semibold">
+                            Centang semua pilihan yang merupakan jawaban benar (bisa 2 atau lebih).
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-extrabold text-indigo-900 bg-indigo-100/90 border border-indigo-200 px-2.5 py-0.5 rounded-lg shrink-0 self-start sm:self-auto">
+                          Kunci: {correctAnswersComplex.length > 0 ? correctAnswersComplex.join(', ') : 'Belum dipilih'}
+                        </span>
+                      </div>
+
+                      {/* Complex checkboxes */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {(['A', 'B', 'C', 'D'] as const).map((key) => {
+                          const isChecked = correctAnswersComplex.includes(key);
+                          const optLabel =
+                            key === 'A'
+                              ? optionA
+                              : key === 'B'
+                              ? optionB
+                              : key === 'C'
+                              ? optionC
+                              : optionD;
+
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => toggleComplexOption(key)}
+                              className={`p-2.5 rounded-xl border-2 font-bold flex items-center justify-between transition-all cursor-pointer select-none text-left ${
                                 isChecked
-                                  ? 'bg-white text-emerald-700 shadow-2xs'
-                                  : 'bg-slate-100 text-slate-700 border border-slate-300'
+                                  ? 'bg-emerald-500 border-emerald-600 text-white shadow-xs'
+                                  : 'bg-white border-indigo-200 text-slate-700 hover:border-indigo-400 hover:bg-indigo-50/40'
                               }`}
                             >
-                              {key}
-                            </span>
-                            <span className="truncate text-xs">
-                              {optLabel ? optLabel : `Opsi ${key}`}
-                            </span>
-                          </div>
-                          {isChecked ? (
-                            <Check className="w-4 h-4 text-white stroke-[3] shrink-0 ml-1" />
-                          ) : (
-                            <span className="w-4 h-4 rounded border border-slate-300 bg-white shrink-0 ml-1" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                              <div className="flex items-center space-x-2 min-w-0">
+                                <span
+                                  className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 ${
+                                    isChecked
+                                      ? 'bg-white text-emerald-700 shadow-2xs'
+                                      : 'bg-slate-100 text-slate-700 border border-slate-300'
+                                  }`}
+                                >
+                                  {key}
+                                </span>
+                                <span className="truncate text-xs">
+                                  {optLabel ? optLabel : `Opsi ${key}`}
+                                </span>
+                              </div>
+                              {isChecked ? (
+                                <Check className="w-4 h-4 text-white stroke-[3] shrink-0 ml-1" />
+                              ) : (
+                                <span className="w-4 h-4 rounded border border-slate-300 bg-white shrink-0 ml-1" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold uppercase mb-1">
-                      Bobot Nilai Soal
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      required
-                      value={weight}
-                      onChange={(e) => setWeight(Number(e.target.value))}
-                      className="w-full sm:w-48 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none font-bold"
-                    />
-                  </div>
-                </div>
+                      <div>
+                        <label className="block text-slate-700 font-bold uppercase mb-1">
+                          Bobot Nilai Soal
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          required
+                          value={weight}
+                          onChange={(e) => setWeight(Number(e.target.value))}
+                          className="w-full sm:w-48 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none font-bold"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Explanation */}

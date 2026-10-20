@@ -330,9 +330,39 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                     <div className="font-bold text-slate-900">
                       Soal #{idx + 1}: {convertLatexToStandardMath(q.question)}
                     </div>
-                    <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-lg">
-                      Kunci Jawaban: <strong>Pilihan {q.correctAnswer}</strong>
-                    </div>
+                    {q.type === 'COMPLEX_TF' && Array.isArray(q.statements) && q.statements.length > 0 ? (
+                      <div className="text-xs font-semibold text-teal-950 bg-teal-50/90 p-3 rounded-xl border border-teal-200 space-y-2">
+                        <div className="font-bold flex items-center space-x-1.5">
+                          <span>Kunci Jawaban Pernyataan (Benar / Salah):</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {q.statements.map((stmt, sIdx) => (
+                            <div key={stmt.id || sIdx} className="flex items-center justify-between gap-2 bg-white/80 p-2 rounded-lg border border-teal-100">
+                              <span className="text-slate-800">
+                                <strong className="text-teal-900">{sIdx + 1}.</strong> {stmt.text}
+                              </span>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase ${
+                                  stmt.isCorrectTrue
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                }`}
+                              >
+                                {stmt.isCorrectTrue ? 'Benar' : 'Salah'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : q.type === 'COMPLEX' && Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0 ? (
+                      <div className="text-xs font-semibold text-indigo-800 bg-indigo-50 p-2.5 rounded-xl border border-indigo-200">
+                        Kunci Jawaban (PG Kompleks): <strong>Pilihan {q.correctAnswers.join(', ')}</strong>
+                      </div>
+                    ) : (
+                      <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-lg">
+                        Kunci Jawaban: <strong>Pilihan {q.correctAnswer}</strong>
+                      </div>
+                    )}
                     {q.explanation && typeof q.explanation === 'string' && q.explanation.trim() && (
                       <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg italic">
                         Pembahasan: {convertLatexToStandardMath(q.explanation)}

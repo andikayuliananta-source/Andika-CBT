@@ -360,7 +360,79 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
+  {
+    questionId: 'q_demo_7',
+    examId: 'exam_demo_mat6_2026',
+    number: 7,
+    type: 'COMPLEX_TF',
+    question: 'Perhatikan beberapa pernyataan tentang bangun ruang kubus dan balok di bawah ini. Tentukan apakah setiap pernyataan bernilai Benar (B) atau Salah (S)!',
+    optionA: 'Benar',
+    optionB: 'Salah',
+    statements: [
+      {
+        id: 's1',
+        text: 'Kubus memiliki 6 sisi datar yang semuanya berbentuk persegi kongruen (sama luas).',
+        isCorrectTrue: true,
+      },
+      {
+        id: 's2',
+        text: 'Balok memiliki 12 rusuk dan tepat 8 titik sudut.',
+        isCorrectTrue: true,
+      },
+      {
+        id: 's3',
+        text: 'Sebuah tabung memiliki 4 titik sudut yang berhadapan satu sama lain.',
+        isCorrectTrue: false,
+      },
+    ],
+    correctAnswer: 'A',
+    weight: 20,
+    explanation: 'Pernyataan 1 Benar (sisi kubus ada 6 persegi kongruen). Pernyataan 2 Benar (balok memiliki 12 rusuk dan 8 titik sudut). Pernyataan 3 Salah karena bangun ruang tabung tidak memiliki titik sudut sama sekali.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
 ];
+
+// ==========================================
+// STATEMENT ANSWER HELPERS (COMPLEX_TF)
+// ==========================================
+
+export function parseStatementAnswers(raw?: string | null): Record<string, 'B' | 'S'> {
+  if (!raw || typeof raw !== 'string') return {};
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'object' && parsed !== null) {
+        const out: Record<string, 'B' | 'S'> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v === 'B' || v === 'S') {
+            out[k] = v;
+          }
+        }
+        return out;
+      }
+    } catch {
+      // fallback
+    }
+  }
+  // Fallback for format "s1:B,s2:S"
+  const result: Record<string, 'B' | 'S'> = {};
+  const parts = trimmed.split(',');
+  for (const part of parts) {
+    const [id, val] = part.split(':').map((s) => s.trim().toUpperCase());
+    if (id && (val === 'B' || val === 'S')) {
+      result[id] = val;
+    }
+  }
+  return result;
+}
+
+export function serializeStatementAnswers(map: Record<string, 'B' | 'S'>): string {
+  if (!map || Object.keys(map).length === 0) return '';
+  return JSON.stringify(map);
+}
 
 // ==========================================
 // QUESTION OPERATIONS
@@ -459,6 +531,10 @@ export async function getStudentQuestions(exam: Exam): Promise<StudentSafeQuesti
     optionB: q.optionB,
     optionC: q.optionC,
     optionD: q.optionD,
+    statements: q.statements?.map((s) => ({
+      id: s.id,
+      text: s.text,
+    })),
     weight: q.weight,
   }));
 
@@ -529,6 +605,11 @@ export async function updateQuestion(examId: string, questionId: string, updates
       rawUpdates.optionD = deleteField();
     }
     if (rawUpdates.type === 'SINGLE') {
+      rawUpdates.correctAnswers = deleteField();
+      rawUpdates.statements = deleteField();
+    } else if (rawUpdates.type === 'COMPLEX') {
+      rawUpdates.statements = deleteField();
+    } else if (rawUpdates.type === 'COMPLEX_TF') {
       rawUpdates.correctAnswers = deleteField();
     }
 
@@ -1206,11 +1287,25 @@ export async function submitExamAndCalculateScore(
     totalWeight += weight;
 
     const studentChoice = studentAnswers[q.questionId]?.answer;
+    const isComplexTF = q.type === 'COMPLEX_TF' && Array.isArray(q.statements) && q.statements.length > 0;
     const isComplex = q.type === 'COMPLEX' || (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0);
 
     let isCorrect = false;
 
-    if (isComplex) {
+    if (isComplexTF && q.statements) {
+      const studentMap = parseStatementAnswers(studentChoice);
+      const allStatementsPresent = q.statements.every((stmt) => studentMap[stmt.id] !== undefined);
+      const allStatementsMatch =
+        allStatementsPresent &&
+        q.statements.every((stmt) => {
+          const expected = stmt.isCorrectTrue ? 'B' : 'S';
+          return studentMap[stmt.id] === expected;
+        });
+
+      if (allStatementsMatch) {
+        isCorrect = true;
+      }
+    } else if (isComplex) {
       // Determine canonical list of correct answers
       const correctList: string[] = (
         q.correctAnswers && q.correctAnswers.length > 0

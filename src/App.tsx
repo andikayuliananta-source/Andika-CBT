@@ -142,10 +142,12 @@ export default function App() {
           number: q.number,
           question: q.question,
           imageUrl: q.imageUrl,
+          type: q.type || 'SINGLE',
           optionA: q.optionA,
           optionB: q.optionB,
           optionC: q.optionC,
           optionD: q.optionD,
+          statements: q.statements?.map((s) => ({ id: s.id, text: s.text })),
           weight: q.weight,
         }));
       }
@@ -159,10 +161,12 @@ export default function App() {
         number: q.number,
         question: q.question,
         imageUrl: q.imageUrl,
+        type: q.type || 'SINGLE',
         optionA: q.optionA,
         optionB: q.optionB,
         optionC: q.optionC,
         optionD: q.optionD,
+        statements: q.statements?.map((s) => ({ id: s.id, text: s.text })),
         weight: q.weight,
       }));
       setQuestions(fallback);
@@ -195,10 +199,12 @@ export default function App() {
           number: q.number,
           question: q.question,
           imageUrl: q.imageUrl,
+          type: q.type || 'SINGLE',
           optionA: q.optionA,
           optionB: q.optionB,
           optionC: q.optionC,
           optionD: q.optionD,
+          statements: q.statements?.map((s) => ({ id: s.id, text: s.text })),
           weight: q.weight,
         }));
         setQuestions(safeQuestions);
