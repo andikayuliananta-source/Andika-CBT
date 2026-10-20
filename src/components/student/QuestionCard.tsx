@@ -266,13 +266,26 @@ export const QuestionCard = React.memo<QuestionCardProps>(({
                     <span className="w-6 h-6 rounded-lg bg-teal-100 text-teal-900 font-extrabold flex items-center justify-center text-xs shrink-0 mt-0.5">
                       {sIdx + 1}
                     </span>
-                    <span
-                      className={`font-bold text-slate-800 leading-snug ${
-                        fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
-                      }`}
-                    >
-                      {convertLatexToStandardMath(stmt.text)}
-                    </span>
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <span
+                        className={`font-bold text-slate-800 leading-snug block ${
+                          fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
+                        }`}
+                      >
+                        {convertLatexToStandardMath(stmt.text)}
+                      </span>
+                      {stmt.imageUrl && (
+                        <div className="pt-1">
+                          <img
+                            src={stmt.imageUrl}
+                            alt={`Gambar pernyataan ${sIdx + 1}`}
+                            onClick={() => onPreviewImage(stmt.imageUrl!)}
+                            className="max-h-36 sm:max-h-48 max-w-full rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xs object-contain cursor-pointer hover:opacity-95 hover:border-teal-400 transition-all"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* True / False Choice Buttons */}

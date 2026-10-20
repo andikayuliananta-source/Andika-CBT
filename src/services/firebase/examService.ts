@@ -495,6 +495,14 @@ export async function getQuestions(examId: string): Promise<Question[]> {
           ? Object.values(q.correctAnswers)
           : [];
       }
+      if (q.statements !== undefined && Array.isArray(q.statements)) {
+        q.statements = q.statements.map((s, sIdx) => ({
+          id: s.id || `s${sIdx + 1}`,
+          text: typeof s.text === 'string' ? s.text : String(s.text || ''),
+          imageUrl: typeof s.imageUrl === 'string' && s.imageUrl.trim() ? s.imageUrl.trim() : undefined,
+          isCorrectTrue: typeof s.isCorrectTrue === 'boolean' ? s.isCorrectTrue : true,
+        }));
+      }
 
       return q;
     });
@@ -534,6 +542,7 @@ export async function getStudentQuestions(exam: Exam): Promise<StudentSafeQuesti
     statements: q.statements?.map((s) => ({
       id: s.id,
       text: s.text,
+      imageUrl: s.imageUrl || undefined,
     })),
     weight: q.weight,
   }));

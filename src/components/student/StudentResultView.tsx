@@ -337,10 +337,21 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                         </div>
                         <div className="space-y-1.5">
                           {q.statements.map((stmt, sIdx) => (
-                            <div key={stmt.id || sIdx} className="flex items-center justify-between gap-2 bg-white/80 p-2 rounded-lg border border-teal-100">
-                              <span className="text-slate-800">
-                                <strong className="text-teal-900">{sIdx + 1}.</strong> {stmt.text}
-                              </span>
+                            <div key={stmt.id || sIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white/80 p-2.5 rounded-lg border border-teal-100">
+                              <div className="space-y-1">
+                                <span className="text-slate-800">
+                                  <strong className="text-teal-900">{sIdx + 1}.</strong> {stmt.text}
+                                </span>
+                                {stmt.imageUrl && (
+                                  <div>
+                                    <img
+                                      src={stmt.imageUrl}
+                                      alt={`Gambar pernyataan ${sIdx + 1}`}
+                                      className="h-12 max-w-xs object-contain rounded border border-teal-200 bg-white p-0.5"
+                                    />
+                                  </div>
+                                )}
+                              </div>
                               <span
                                 className={`px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase ${
                                   stmt.isCorrectTrue

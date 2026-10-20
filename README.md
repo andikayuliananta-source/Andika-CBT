@@ -30,13 +30,13 @@
 - **Manajemen Ujian**:
   - Pembuatan ujian baru, pengaturan durasi, token ujian, dan status aktif/nonaktif.
   - Pengacakan urutan soal dan opsi jawaban.
-- **Bank Soal Beragam Tipe & Import Excel**:
-  - **Pilihan Ganda Biasa (Single Choice)**: 1 opsi jawaban benar.
-  - **Pilihan Ganda Kompleks Multi-Opsi**: Memilih lebih dari 1 pilihan jawaban yang benar.
-  - **Pilihan Ganda Kompleks Pernyataan (Benar / Salah)**: Daftar butir pernyataan di mana siswa menentukan status **Benar (B)** atau **Salah (S)** pada setiap butir pernyataan.
+- **Bank Soal Beragam Tipe & Import Excel Multi-Model**:
+  - **Pilihan Ganda Biasa (Single Choice)**: 1 opsi jawaban benar (A, B, C, D).
+  - **Pilihan Ganda Kompleks Multi-Opsi**: Memilih lebih dari 1 pilihan jawaban yang benar (contoh: A dan C).
+  - **Pilihan Ganda Kompleks Pernyataan (Benar / Salah)**: Daftar butir pernyataan di mana siswa menentukan status **Benar (B)** atau **Salah (S)** pada setiap butir pernyataan. Mendukung **input gambar ilustrasi pada setiap butir pernyataan** (baik via URL maupun unggah file langsung dari komputer).
   - Penulisan rumus matematika ramah CBT web dengan konversi otomatis simbol standar SD.
-  - Tambah soal secara manual atau import massal via file Excel (`.xlsx`).
-  - Template soal Excel yang mudah digunakan oleh guru.
+  - **Import Massal Excel Canggih**: Mendukung import sekaligus untuk seluruh tipe soal (PG Biasa, PG Kompleks Multi-Opsi, dan PG Pernyataan Benar/Salah lengkap dengan kolom link gambar pernyataan) via file Excel (`.xlsx`).
+  - Template soal Excel resmi 2 sheet (Lembar Soal & Lembar Panduan Pengisian) yang siap diunduh dan digunakan oleh guru.
 - **Monitoring Peserta Real-time**:
   - Pantau siswa yang sedang mengerjakan ujian secara langsung (*live status*).
   - Reset status peserta per-individu jika siswa mengalami kendala perangkat atau internet.

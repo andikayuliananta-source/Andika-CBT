@@ -147,7 +147,11 @@ export default function App() {
           optionB: q.optionB,
           optionC: q.optionC,
           optionD: q.optionD,
-          statements: q.statements?.map((s) => ({ id: s.id, text: s.text })),
+          statements: q.statements?.map((s) => ({
+            id: s.id,
+            text: s.text,
+            imageUrl: s.imageUrl || undefined,
+          })),
           weight: q.weight,
         }));
       }
@@ -166,7 +170,11 @@ export default function App() {
         optionB: q.optionB,
         optionC: q.optionC,
         optionD: q.optionD,
-        statements: q.statements?.map((s) => ({ id: s.id, text: s.text })),
+        statements: q.statements?.map((s) => ({
+          id: s.id,
+          text: s.text,
+          imageUrl: s.imageUrl || undefined,
+        })),
         weight: q.weight,
       }));
       setQuestions(fallback);
@@ -204,7 +212,11 @@ export default function App() {
           optionB: q.optionB,
           optionC: q.optionC,
           optionD: q.optionD,
-          statements: q.statements?.map((s) => ({ id: s.id, text: s.text })),
+          statements: q.statements?.map((s) => ({
+            id: s.id,
+            text: s.text,
+            imageUrl: s.imageUrl || undefined,
+          })),
           weight: q.weight,
         }));
         setQuestions(safeQuestions);

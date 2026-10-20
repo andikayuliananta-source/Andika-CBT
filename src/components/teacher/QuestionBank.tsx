@@ -246,9 +246,9 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     setCorrectAnswer('A');
     setCorrectAnswersComplex(['A']);
     setStatements([
-      { id: 's1', text: '', isCorrectTrue: true },
-      { id: 's2', text: '', isCorrectTrue: false },
-      { id: 's3', text: '', isCorrectTrue: true },
+      { id: 's1', text: '', imageUrl: '', isCorrectTrue: true },
+      { id: 's2', text: '', imageUrl: '', isCorrectTrue: false },
+      { id: 's3', text: '', imageUrl: '', isCorrectTrue: true },
     ]);
     setActiveStatementIndex(null);
     setWeight(20);
@@ -306,14 +306,15 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
         q.statements.map((s, idx) => ({
           id: s.id || `s${idx + 1}`,
           text: typeof s.text === 'string' ? s.text : String(s.text || ''),
+          imageUrl: typeof s.imageUrl === 'string' ? s.imageUrl : '',
           isCorrectTrue: typeof s.isCorrectTrue === 'boolean' ? s.isCorrectTrue : true,
         }))
       );
     } else {
       setStatements([
-        { id: 's1', text: '', isCorrectTrue: true },
-        { id: 's2', text: '', isCorrectTrue: false },
-        { id: 's3', text: '', isCorrectTrue: true },
+        { id: 's1', text: '', imageUrl: '', isCorrectTrue: true },
+        { id: 's2', text: '', imageUrl: '', isCorrectTrue: false },
+        { id: 's3', text: '', imageUrl: '', isCorrectTrue: true },
       ]);
     }
     setActiveStatementIndex(null);
@@ -340,7 +341,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     }
     const nextNum = statements.length + 1;
     const nextId = `s_${Date.now()}_${nextNum}`;
-    setStatements((prev) => [...prev, { id: nextId, text: '', isCorrectTrue: true }]);
+    setStatements((prev) => [...prev, { id: nextId, text: '', imageUrl: '', isCorrectTrue: true }]);
   };
 
   const handleRemoveStatement = (index: number) => {
@@ -358,6 +359,12 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
   const handleUpdateStatementText = (index: number, text: string) => {
     setStatements((prev) =>
       prev.map((s, idx) => (idx === index ? { ...s, text } : s))
+    );
+  };
+
+  const handleUpdateStatementImage = (index: number, imageUrl: string) => {
+    setStatements((prev) =>
+      prev.map((s, idx) => (idx === index ? { ...s, imageUrl } : s))
     );
   };
 
@@ -423,6 +430,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
         payload.statements = statements.map((s, idx) => ({
           id: s.id || `s${idx + 1}`,
           text: convertLatexToStandardMath(s.text.trim()),
+          ...(s.imageUrl && s.imageUrl.trim() ? { imageUrl: s.imageUrl.trim() } : {}),
           isCorrectTrue: Boolean(s.isCorrectTrue),
         }));
       } else if (questionType === 'COMPLEX') {
@@ -662,13 +670,25 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                       key={stmt.id || sIdx}
                       className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                     >
-                      <div className="flex items-start space-x-2">
+                      <div className="flex items-start space-x-2 flex-1 min-w-0">
                         <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5 sm:mt-0">
                           {sIdx + 1}
                         </span>
-                        <span className="font-semibold text-slate-800 leading-snug">
-                          {stmt.text}
-                        </span>
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <span className="font-semibold text-slate-800 leading-snug block">
+                            {stmt.text}
+                          </span>
+                          {stmt.imageUrl && (
+                            <div className="pt-0.5">
+                              <img
+                                src={stmt.imageUrl}
+                                alt={`Gambar pernyataan ${sIdx + 1}`}
+                                onClick={() => setPreviewImageZoom(stmt.imageUrl || null)}
+                                className="h-14 max-w-xs object-contain rounded-lg border border-slate-200 bg-white p-1 cursor-pointer hover:border-amber-400 shadow-2xs transition-all"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <span
                         className={`inline-flex items-center space-x-1 px-3 py-1 rounded-xl text-xs font-black uppercase shrink-0 self-start sm:self-auto ${
@@ -1467,6 +1487,78 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                           placeholder={`Tuliskan pernyataan ${idx + 1}... (contoh: Kubus memiliki 6 sisi berbentuk persegi kongruen)`}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-teal-500 font-medium text-xs"
                         />
+
+                        {/* Optional Image for Statement */}
+                        <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-slate-700 flex items-center space-x-1.5">
+                              <ImageIcon className="w-3.5 h-3.5 text-teal-600" />
+                              <span>Gambar Pernyataan (Opsional)</span>
+                            </span>
+                            {stmt.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStatementImage(idx, '')}
+                                className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Hapus Gambar</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="url"
+                                value={stmt.imageUrl || ''}
+                                onChange={(e) => handleUpdateStatementImage(idx, e.target.value)}
+                                placeholder="Link URL gambar (https://... atau klik tombol Unggah)"
+                                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-teal-500 font-medium text-xs"
+                              />
+                              <Link2 className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            </div>
+
+                            <label className="px-2.5 py-1.5 bg-white hover:bg-teal-50 text-teal-800 border border-teal-300 hover:border-teal-500 rounded-lg text-xs font-bold flex items-center space-x-1 cursor-pointer shrink-0 transition-colors shadow-2xs">
+                              <Upload className="w-3.5 h-3.5 text-teal-600" />
+                              <span>Unggah</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    const res = await compressImageFile(file, {
+                                      maxDimension: 800,
+                                      quality: 0.82,
+                                      maxFileSizeMb: 8,
+                                    });
+                                    handleUpdateStatementImage(idx, res.dataUrl);
+                                  } catch (err: any) {
+                                    alert(err.message || 'Gagal memproses gambar pernyataan');
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+
+                          {stmt.imageUrl && (
+                            <div className="flex items-center space-x-2.5 pt-1 bg-teal-50/70 p-2 rounded-lg border border-teal-200">
+                              <img
+                                src={stmt.imageUrl}
+                                alt={`Pratinjau Gambar Pernyataan ${idx + 1}`}
+                                className="h-14 max-w-xs object-contain rounded border border-teal-300 bg-white p-0.5 shadow-2xs cursor-pointer hover:border-amber-400"
+                                onClick={() => setPreviewImageZoom(stmt.imageUrl || null)}
+                              />
+                              <span className="text-[10px] text-teal-900 font-semibold">
+                                Gambar siap ditampilkan pada butir pernyataan {idx + 1}. Klik untuk perbesar.
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

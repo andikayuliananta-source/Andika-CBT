@@ -11,12 +11,14 @@ export type QuestionType = 'SINGLE' | 'COMPLEX' | 'COMPLEX_TF'; // SINGLE = PG B
 export interface QuestionStatement {
   id: string; // e.g. "s1", "s2", "s3"
   text: string;
+  imageUrl?: string; // Optional image URL for the statement/visual stimulus
   isCorrectTrue: boolean; // true = Benar, false = Salah
 }
 
 export interface StudentSafeStatement {
   id: string;
   text: string;
+  imageUrl?: string; // Optional image URL for student exam view
 }
 
 export interface User {
