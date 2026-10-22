@@ -71,10 +71,11 @@ export function cleanFirestoreData<T>(data: T): T {
 }
 
 // ==========================================
-// IN-MEMORY CACHE FOR HIGH CONCURRENCY (500+ STUDENTS)
+// IN-MEMORY CACHE FOR HIGH CONCURRENCY (800+ STUDENTS)
 // ==========================================
 const questionsCache = new Map<string, { questions: Question[]; timestamp: number }>();
 const examCache = new Map<string, { exam: Exam; timestamp: number }>();
+const tokenCache = new Map<string, { exam: Exam; timestamp: number }>();
 const CACHE_TTL_MS = 60 * 1000; // 60 seconds cache to shield Firestore from concurrent fetch storms
 
 export function clearExamServiceCaches(examId?: string): void {
@@ -85,6 +86,7 @@ export function clearExamServiceCaches(examId?: string): void {
     questionsCache.clear();
     examCache.clear();
   }
+  tokenCache.clear();
 }
 
 // ==========================================
@@ -126,12 +128,53 @@ export async function getExamById(examId: string): Promise<Exam | null> {
 
 export async function getExamByToken(token: string): Promise<{ exam: Exam | null; error?: string }> {
   const cleanToken = token.trim().toUpperCase();
+  if (!cleanToken) {
+    return { exam: null, error: 'Token ujian wajib diisi.' };
+  }
+
+  // Check in-memory token cache for high concurrency (800+ students entering same token)
+  const cached = tokenCache.get(cleanToken);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return { exam: cached.exam };
+  }
+
+  // Fast-track demo token without Firestore latency if offline/high-traffic
+  if (cleanToken === 'MAT6A26' || cleanToken.includes('DEMO')) {
+    const demoExam: Exam = {
+      examId: 'exam_demo_mat6_2026',
+      title: 'Penilaian Sumatif Matematika Kelas 6 SD',
+      subject: 'Matematika',
+      grade: '6',
+      phase: 'C',
+      description: 'Ujian simulasi komprehensif Matematika SD berbasis CBT ramah anak.',
+      token: 'MAT6A26',
+      startAt: '2026-01-01T00:00:00.000Z',
+      endAt: '2027-12-31T23:59:59.000Z',
+      durationMinutes: 60,
+      kkm: 75,
+      status: 'ACTIVE',
+      showScore: true,
+      showAnswerReview: true,
+      shuffleQuestions: false,
+      shuffleOptions: false,
+      createdBy: 'andika.yuliananta@gmail.com',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    tokenCache.set(cleanToken, { exam: demoExam, timestamp: Date.now() });
+    examCache.set(demoExam.examId, { exam: demoExam, timestamp: Date.now() });
+  }
+
   const path = 'exams';
   try {
     const q = query(collection(db, path), where('token', '==', cleanToken));
     const snap = await getDocs(q);
 
     if (snap.empty) {
+      if (cleanToken === 'MAT6A26') {
+        const cachedDemo = tokenCache.get(cleanToken);
+        if (cachedDemo) return { exam: cachedDemo.exam };
+      }
       return { exam: null, error: 'Token ujian tidak ditemukan. Periksa kembali token dari gurumu.' };
     }
 
@@ -161,8 +204,12 @@ export async function getExamByToken(token: string): Promise<{ exam: Exam | null
       }).catch((e) => console.warn('Auto-heal exam status info:', e));
     }
 
+    tokenCache.set(cleanToken, { exam, timestamp: Date.now() });
+    examCache.set(exam.examId, { exam, timestamp: Date.now() });
+
     return { exam };
   } catch (error) {
+    if (cached) return { exam: cached.exam };
     handleFirestoreError(error, OperationType.LIST, path);
     return { exam: null, error: 'Terjadi gangguan koneksi saat memeriksa token.' };
   }
@@ -272,7 +319,8 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     questionId: 'q_demo_1',
     examId: 'exam_demo_mat6_2026',
     number: 1,
-    question: 'Hasil dari 3/4 + 1/2 dalam bentuk pecahan paling sederhana adalah ...',
+    question: 'Perhatikan gambar stimulus di bawah ini! Hasil penjumlahan pecahan 3/4 + 1/2 dalam bentuk pecahan paling sederhana adalah ...',
+    imageUrl: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=600&auto=format&fit=crop&q=80',
     optionA: '4/6',
     optionB: '5/4 atau 1 1/4',
     optionC: '4/4',
@@ -287,7 +335,8 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     questionId: 'q_demo_2',
     examId: 'exam_demo_mat6_2026',
     number: 2,
-    question: 'Sebuah lingkaran memiliki jari-jari (r) sepanjang 14 cm. Berapakah luas lingkaran tersebut? (Gunakan π = 22/7)',
+    question: 'Perhatikan ilustrasi lingkaran pada gambar! Sebuah lingkaran memiliki jari-jari (r) sepanjang 14 cm. Berapakah luas lingkaran tersebut? (Gunakan π = 22/7)',
+    imageUrl: 'https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=600&auto=format&fit=crop&q=80',
     optionA: '616 cm²',
     optionB: '308 cm²',
     optionC: '88 cm²',
@@ -302,7 +351,8 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     questionId: 'q_demo_3',
     examId: 'exam_demo_mat6_2026',
     number: 3,
-    question: 'Bentuk persen dari pecahan 3/5 adalah ...',
+    question: 'Perhatikan stimulus diagram persentase berikut! Bentuk persen dari pecahan 3/5 adalah ...',
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&auto=format&fit=crop&q=80',
     optionA: '30%',
     optionB: '50%',
     optionC: '60%',
@@ -317,7 +367,8 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     questionId: 'q_demo_4',
     examId: 'exam_demo_mat6_2026',
     number: 4,
-    question: 'Sebuah balok memiliki panjang 10 cm, lebar 6 cm, dan tinggi 5 cm. Volume balok tersebut adalah ...',
+    question: 'Perhatikan gambar bangun ruang balok di bawah ini! Sebuah balok memiliki panjang 10 cm, lebar 6 cm, dan tinggi 5 cm. Volume balok tersebut adalah ...',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
     optionA: '150 cm³',
     optionB: '210 cm³',
     optionC: '300 cm³',
@@ -332,7 +383,8 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     questionId: 'q_demo_5',
     examId: 'exam_demo_mat6_2026',
     number: 5,
-    question: 'Rata-rata (mean) dari nilai ulangan matematika siswa: 70, 80, 85, 90, 75 adalah ...',
+    question: 'Perhatikan grafik data nilai ulangan pada gambar! Rata-rata (mean) dari nilai ulangan matematika siswa: 70, 80, 85, 90, 75 adalah ...',
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
     optionA: '78',
     optionB: '80',
     optionC: '82',
@@ -348,7 +400,8 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     examId: 'exam_demo_mat6_2026',
     number: 6,
     type: 'COMPLEX',
-    question: 'Manakah pernyataan di bawah ini yang merupakan sifat-sifat dari bangun datar persegi? (Pilihlah semua pernyataan yang benar!)',
+    question: 'Perhatikan gambar bangun datar berikut! Manakah pernyataan di bawah ini yang merupakan sifat-sifat dari bangun datar persegi? (Pilihlah semua pernyataan yang benar!)',
+    imageUrl: 'https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?w=600&auto=format&fit=crop&q=80',
     optionA: 'Memiliki 4 sisi yang sama panjang',
     optionB: 'Memiliki 4 sudut siku-siku (90°)',
     optionC: 'Hanya memiliki sepasang sisi sejajar',
@@ -365,23 +418,27 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     examId: 'exam_demo_mat6_2026',
     number: 7,
     type: 'COMPLEX_TF',
-    question: 'Perhatikan beberapa pernyataan tentang bangun ruang kubus dan balok di bawah ini. Tentukan apakah setiap pernyataan bernilai Benar (B) atau Salah (S)!',
+    question: 'Perhatikan gambar stimulus bangun ruang berikut! Tentukan apakah setiap butir pernyataan di bawah ini bernilai Benar (B) atau Salah (S)!',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
     optionA: 'Benar',
     optionB: 'Salah',
     statements: [
       {
         id: 's1',
         text: 'Kubus memiliki 6 sisi datar yang semuanya berbentuk persegi kongruen (sama luas).',
+        imageUrl: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=400&auto=format&fit=crop&q=80',
         isCorrectTrue: true,
       },
       {
         id: 's2',
         text: 'Balok memiliki 12 rusuk dan tepat 8 titik sudut.',
+        imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
         isCorrectTrue: true,
       },
       {
         id: 's3',
         text: 'Sebuah tabung memiliki 4 titik sudut yang berhadapan satu sama lain.',
+        imageUrl: 'https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=400&auto=format&fit=crop&q=80',
         isCorrectTrue: false,
       },
     ],

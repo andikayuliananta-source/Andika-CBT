@@ -581,6 +581,33 @@ export const ExamEngine: React.FC<ExamEngineProps> = ({
     return () => clearInterval(timer);
   }, [securityTermination, onFinishExam]);
 
+  // Intelligent Image Preloader for instant stimulus rendering across all 800 concurrent students
+  useEffect(() => {
+    if (!questions || questions.length === 0) return;
+    const preloadUrls: string[] = [];
+    const indicesToPreload = [currentIndex, currentIndex + 1, currentIndex + 2, currentIndex - 1];
+    indicesToPreload.forEach((idx) => {
+      if (idx >= 0 && idx < questions.length) {
+        const q = questions[idx];
+        if (q.imageUrl && q.imageUrl.trim() && !q.imageUrl.startsWith('data:')) {
+          preloadUrls.push(q.imageUrl.trim());
+        }
+        if (q.statements && Array.isArray(q.statements)) {
+          q.statements.forEach((s) => {
+            if (s.imageUrl && s.imageUrl.trim() && !s.imageUrl.startsWith('data:')) {
+              preloadUrls.push(s.imageUrl.trim());
+            }
+          });
+        }
+      }
+    });
+
+    preloadUrls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, [currentIndex, questions]);
+
   const queueAnswerSync = useCallback(
     (questionId: string, answer: string, marked: boolean) => {
       // Clear existing debounce timer for this question if student clicked options rapidly

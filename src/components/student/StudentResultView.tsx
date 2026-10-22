@@ -330,6 +330,17 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                     <div className="font-bold text-slate-900">
                       Soal #{idx + 1}: {convertLatexToStandardMath(q.question)}
                     </div>
+                    {q.imageUrl && typeof q.imageUrl === 'string' && q.imageUrl.trim() && (
+                      <div className="pt-1">
+                        <img
+                          src={q.imageUrl}
+                          alt={`Stimulus Soal #${idx + 1}`}
+                          className="max-h-36 max-w-sm rounded-xl border border-slate-200 bg-white p-1 object-contain"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
                     {q.type === 'COMPLEX_TF' && Array.isArray(q.statements) && q.statements.length > 0 ? (
                       <div className="text-xs font-semibold text-teal-950 bg-teal-50/90 p-3 rounded-xl border border-teal-200 space-y-2">
                         <div className="font-bold flex items-center space-x-1.5">
@@ -347,7 +358,9 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                                     <img
                                       src={stmt.imageUrl}
                                       alt={`Gambar pernyataan ${sIdx + 1}`}
-                                      className="h-12 max-w-xs object-contain rounded border border-teal-200 bg-white p-0.5"
+                                      className="h-14 max-w-xs object-contain rounded border border-teal-200 bg-white p-0.5"
+                                      loading="lazy"
+                                      referrerPolicy="no-referrer"
                                     />
                                   </div>
                                 )}

@@ -275,13 +275,13 @@ export const QuestionCard = React.memo<QuestionCardProps>(({
                         {convertLatexToStandardMath(stmt.text)}
                       </span>
                       {stmt.imageUrl && (
-                        <div className="pt-1">
-                          <img
+                        <div className="pt-1.5 max-w-sm">
+                          <QuestionImage
                             src={stmt.imageUrl}
-                            alt={`Gambar pernyataan ${sIdx + 1}`}
-                            onClick={() => onPreviewImage(stmt.imageUrl!)}
-                            className="max-h-36 sm:max-h-48 max-w-full rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xs object-contain cursor-pointer hover:opacity-95 hover:border-teal-400 transition-all"
-                            loading="lazy"
+                            alt={`Gambar stimulus pernyataan ${sIdx + 1}`}
+                            onZoom={() => onPreviewImage(stmt.imageUrl || '')}
+                            className="p-1 max-w-sm bg-white"
+                            imgClassName="max-h-36 sm:max-h-48"
                           />
                         </div>
                       )}

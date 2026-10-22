@@ -10,10 +10,34 @@ interface QuestionImageProps {
   allowZoom?: boolean;
 }
 
+export function normalizeImageUrl(rawUrl?: string | null): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let url = rawUrl.trim();
+  if (!url) return '';
+
+  // Google Drive share link converter
+  // Converts view/open links to direct embed/view URLs
+  const gDriveMatch1 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (gDriveMatch1 && gDriveMatch1[1]) {
+    return `https://drive.google.com/uc?export=view&id=${gDriveMatch1[1]}`;
+  }
+  const gDriveMatch2 = url.match(/drive\.google\.com\/(?:open|uc)\?id=([a-zA-Z0-9_-]+)/);
+  if (gDriveMatch2 && gDriveMatch2[1]) {
+    return `https://drive.google.com/uc?export=view&id=${gDriveMatch2[1]}`;
+  }
+
+  // Dropbox link converter: dl=0 -> raw=1
+  if (url.includes('dropbox.com') && url.includes('dl=0')) {
+    return url.replace('dl=0', 'raw=1');
+  }
+
+  return url;
+}
+
 /**
  * QuestionImage with lazy loading (loading="lazy", decoding="async"),
- * skeleton placeholder while fetching, and fallback UI with placeholder icon
- * and retry functionality when image fails to load.
+ * skeleton placeholder while fetching, hotlinking protection bypass (referrerPolicy="no-referrer"),
+ * and fallback UI with placeholder icon and retry functionality when image fails to load.
  */
 export const QuestionImage: React.FC<QuestionImageProps> = ({
   src,
@@ -27,7 +51,7 @@ export const QuestionImage: React.FC<QuestionImageProps> = ({
   const [hasError, setHasError] = useState<boolean>(false);
   const [retryCount, setRetryCount] = useState<number>(0);
 
-  const cleanSrc = typeof src === 'string' ? src.trim() : '';
+  const cleanSrc = normalizeImageUrl(src);
 
   // Reset states when the image source changes or user clicks retry
   useEffect(() => {
@@ -117,6 +141,7 @@ export const QuestionImage: React.FC<QuestionImageProps> = ({
             alt={alt}
             loading="lazy"
             decoding="async"
+            referrerPolicy="no-referrer"
             onLoad={() => setLoading(false)}
             onError={() => {
               setLoading(false);
