@@ -319,7 +319,7 @@ export const DEFAULT_DEMO_QUESTIONS: Question[] = [
     questionId: 'q_demo_1',
     examId: 'exam_demo_mat6_2026',
     number: 1,
-    question: 'Perhatikan gambar stimulus di bawah ini! Hasil penjumlahan pecahan 3/4 + 1/2 dalam bentuk pecahan paling sederhana adalah ...',
+    question: 'Perhatikan stimulus dan bacaan di bawah ini!<br><br>Ibu membeli 3/4 kg tepung terigu untuk membuat kue bolu. Di lemari dapur masih tersisa 1/2 kg tepung terigu.<br><br>Hasil penjumlahan persediaan tepung terigu tersebut dalam bentuk pecahan paling sederhana adalah ...',
     imageUrl: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=600&auto=format&fit=crop&q=80',
     optionA: '4/6',
     optionB: '5/4 atau 1 1/4',

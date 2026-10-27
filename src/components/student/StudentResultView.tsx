@@ -24,6 +24,7 @@ import {
 import { Result, Exam, Question } from '../../types';
 import { getQuestions } from '../../services/firebase/examService';
 import { convertLatexToStandardMath } from '../../utils/mathFormatter';
+import { formatQuestionDisplay } from '../../utils/textFormatter';
 import {
   downloadResultCardImage,
   shareOrDownloadResultCard,
@@ -327,8 +328,15 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
               <div className="p-4 space-y-4 max-h-96 overflow-y-auto divide-y divide-slate-100">
                 {questions.map((q, idx) => (
                   <div key={q.questionId} className="pt-3 first:pt-0 space-y-1.5 text-xs sm:text-sm">
-                    <div className="font-bold text-slate-900">
-                      Soal #{idx + 1}: {convertLatexToStandardMath(q.question)}
+                    <div
+                      className="font-bold text-slate-900 whitespace-pre-wrap break-words leading-relaxed"
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      Soal #{idx + 1}: {formatQuestionDisplay(q.question)}
                     </div>
                     {q.imageUrl && typeof q.imageUrl === 'string' && q.imageUrl.trim() && (
                       <div className="pt-1">
@@ -350,8 +358,14 @@ export const StudentResultView: React.FC<StudentResultViewProps> = ({
                           {q.statements.map((stmt, sIdx) => (
                             <div key={stmt.id || sIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white/80 p-2.5 rounded-lg border border-teal-100">
                               <div className="space-y-1">
-                                <span className="text-slate-800">
-                                  <strong className="text-teal-900">{sIdx + 1}.</strong> {stmt.text}
+                                <span
+                                  className="text-slate-800 whitespace-pre-wrap break-words block"
+                                  style={{
+                                    whiteSpace: 'pre-wrap',
+                                    overflowWrap: 'break-word',
+                                  }}
+                                >
+                                  <strong className="text-teal-900">{sIdx + 1}.</strong> {formatQuestionDisplay(stmt.text)}
                                 </span>
                                 {stmt.imageUrl && (
                                   <div>

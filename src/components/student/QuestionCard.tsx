@@ -16,6 +16,7 @@ import {
 import { StudentSafeQuestion } from '../../types';
 import { parseStatementAnswers } from '../../services/firebase/examService';
 import { convertLatexToStandardMath } from '../../utils/mathFormatter';
+import { formatQuestionDisplay } from '../../utils/textFormatter';
 import { QuestionImage } from '../common/QuestionImage';
 
 export interface QuestionCardProps {
@@ -86,7 +87,11 @@ export const QuestionCard = React.memo<QuestionCardProps>(({
   }, [isComplexTF, question.statements, statementAnswers]);
 
   return (
-    <div className="lg:col-span-3 bg-white rounded-2xl sm:rounded-3xl border-2 border-amber-200 p-3.5 sm:p-7 shadow-sm flex flex-col justify-between space-y-4 sm:space-y-6 min-h-[380px] sm:min-h-[460px]">
+    <div
+      id="cbt-question-card-container"
+      className="lg:col-span-3 bg-white rounded-2xl sm:rounded-3xl border-2 border-amber-200 p-3.5 sm:p-7 shadow-sm flex flex-col justify-between space-y-4 sm:space-y-6 min-h-[380px] sm:min-h-[460px] max-h-[calc(100vh-140px)] overflow-y-auto"
+      style={{ overflowY: 'auto' }}
+    >
       <div className="space-y-3.5 sm:space-y-5">
         {/* Question Header */}
         <div className="flex items-center justify-between border-b border-amber-100 pb-2.5 sm:pb-3 gap-2">
@@ -209,11 +214,17 @@ export const QuestionCard = React.memo<QuestionCardProps>(({
 
         {/* Question Text */}
         <div
-          className={`font-bold text-slate-800 leading-relaxed ${
+          id="cbt-question-text"
+          className={`font-bold text-slate-800 leading-relaxed whitespace-pre-wrap break-words ${
             fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'
           }`}
+          style={{
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-word',
+          }}
         >
-          {convertLatexToStandardMath(question.question)}
+          {formatQuestionDisplay(question.question)}
         </div>
 
         {/* Question Image */}
@@ -268,11 +279,16 @@ export const QuestionCard = React.memo<QuestionCardProps>(({
                     </span>
                     <div className="space-y-2 flex-1 min-w-0">
                       <span
-                        className={`font-bold text-slate-800 leading-snug block ${
+                        className={`font-bold text-slate-800 leading-snug block whitespace-pre-wrap break-words ${
                           fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
                         }`}
+                        style={{
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'break-word',
+                          wordBreak: 'break-word',
+                        }}
                       >
-                        {convertLatexToStandardMath(stmt.text)}
+                        {formatQuestionDisplay(stmt.text)}
                       </span>
                       {stmt.imageUrl && (
                         <div className="pt-1.5 max-w-sm">
@@ -373,11 +389,16 @@ export const QuestionCard = React.memo<QuestionCardProps>(({
                     )}
                   </div>
                   <span
-                    className={`font-bold text-slate-800 flex-1 leading-snug ${
+                    className={`font-bold text-slate-800 flex-1 leading-snug whitespace-pre-wrap break-words ${
                       fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
                     }`}
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      overflowWrap: 'break-word',
+                      wordBreak: 'break-word',
+                    }}
                   >
-                    {convertLatexToStandardMath(optionText)}
+                    {formatQuestionDisplay(optionText)}
                   </span>
                   {isComplex && (
                     <div className="shrink-0">

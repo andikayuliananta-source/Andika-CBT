@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Edit2,
@@ -24,6 +24,13 @@ import {
   ChevronDown,
   ChevronUp,
   Table,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Eye,
+  Pilcrow,
 } from 'lucide-react';
 import { Exam, Question, QuestionType, QuestionStatement } from '../../types';
 import {
@@ -41,6 +48,12 @@ import {
   MATH_CBT_GUIDELINES,
   QUICK_MATH_SYMBOLS,
 } from '../../utils/mathFormatter';
+import {
+  convertNewlinesToBreakTags,
+  convertBreakTagsToNewlines,
+  formatQuestionDisplay,
+  insertTextAtCursor,
+} from '../../utils/textFormatter';
 
 interface QuestionBankProps {
   exams: Exam[];
@@ -83,6 +96,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showMathGuide, setShowMathGuide] = useState(true);
+  const [questionEditorTab, setQuestionEditorTab] = useState<'edit' | 'preview'>('edit');
+  const questionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [activeField, setActiveField] = useState<
     'question' | 'optionA' | 'optionB' | 'optionC' | 'optionD' | 'explanation' | 'statement'
   >('question');
@@ -97,9 +112,22 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     hasLatexCode(explanation) ||
     statements.some((s) => hasLatexCode(s.text));
 
-  // Insert standard math symbol or formula into the currently focused field
+  // Insert standard math symbol or formula into the currently focused field (cursor-aware)
   const handleInsertMathSymbol = (sym: string) => {
     if (activeField === 'question') {
+      if (questionTextareaRef.current) {
+        const res = insertTextAtCursor(questionTextareaRef.current, sym);
+        if (res) {
+          setQuestionText(res.newText);
+          setTimeout(() => {
+            if (questionTextareaRef.current) {
+              questionTextareaRef.current.focus();
+              questionTextareaRef.current.setSelectionRange(res.selectionStart, res.selectionEnd);
+            }
+          }, 10);
+          return;
+        }
+      }
       setQuestionText((prev) => prev + sym);
     } else if (activeField === 'optionA') {
       setOptionA((prev) => prev + sym);
@@ -118,6 +146,24 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
         )
       );
     }
+  };
+
+  // WYSIWYG formatting toolbar actions for the question textarea
+  const handleApplyFormat = (before: string, after: string = '') => {
+    if (activeField === 'question' && questionTextareaRef.current) {
+      const res = insertTextAtCursor(questionTextareaRef.current, before, after);
+      if (res) {
+        setQuestionText(res.newText);
+        setTimeout(() => {
+          if (questionTextareaRef.current) {
+            questionTextareaRef.current.focus();
+            questionTextareaRef.current.setSelectionRange(res.selectionStart, res.selectionEnd);
+          }
+        }, 10);
+        return;
+      }
+    }
+    handleInsertMathSymbol(before + after);
   };
 
   // Convert all LaTeX in current inputs into web CBT friendly text
@@ -234,6 +280,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     setEditingQuestion(null);
     setQuestionType('SINGLE');
     setQuestionText('');
+    setQuestionEditorTab('edit');
     setImageUrl('');
     setImageMeta(null);
     setImageError(null);
@@ -258,6 +305,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
 
   const openEditModal = (q: Question) => {
     setEditingQuestion(q);
+    setQuestionEditorTab('edit');
     const isCompTF = q.type === 'COMPLEX_TF' || (Array.isArray(q.statements) && q.statements.length > 0);
     const isComp = q.type === 'COMPLEX' || (Array.isArray(q.correctAnswers) && q.correctAnswers.length > 1);
     
@@ -269,7 +317,9 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
       setQuestionType('SINGLE');
     }
 
-    setQuestionText(typeof q.question === 'string' ? q.question : String(q.question || ''));
+    // Convert any stored <br> tags into standard newlines \n for editing in textarea
+    const rawQuestion = typeof q.question === 'string' ? q.question : String(q.question || '');
+    setQuestionText(convertBreakTagsToNewlines(rawQuestion));
     
     const safeImg = typeof q.imageUrl === 'string' ? q.imageUrl : '';
     setImageUrl(safeImg);
@@ -305,7 +355,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
       setStatements(
         q.statements.map((s, idx) => ({
           id: s.id || `s${idx + 1}`,
-          text: typeof s.text === 'string' ? s.text : String(s.text || ''),
+          text: convertBreakTagsToNewlines(typeof s.text === 'string' ? s.text : String(s.text || '')),
           imageUrl: typeof s.imageUrl === 'string' ? s.imageUrl : '',
           isCorrectTrue: typeof s.isCorrectTrue === 'boolean' ? s.isCorrectTrue : true,
         }))
@@ -320,7 +370,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
     setActiveStatementIndex(null);
 
     setWeight(q.weight || 20);
-    setExplanation(typeof q.explanation === 'string' ? q.explanation : '');
+    setExplanation(convertBreakTagsToNewlines(typeof q.explanation === 'string' ? q.explanation : ''));
     setIsModalOpen(true);
   };
 
@@ -416,9 +466,13 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
       const cleanQuestion = convertLatexToStandardMath(questionText.trim());
       const cleanExplanation = explanation.trim() ? convertLatexToStandardMath(explanation.trim()) : '';
 
+      // Convert all newlines (\n) to <br> tags before saving to Firestore so paragraphs and line breaks are preserved
+      const finalQuestion = convertNewlinesToBreakTags(cleanQuestion);
+      const finalExplanation = cleanExplanation ? convertNewlinesToBreakTags(cleanExplanation) : '';
+
       const payload: Omit<Question, 'questionId' | 'examId' | 'createdAt' | 'updatedAt'> = {
         number: editingQuestion ? editingQuestion.number : questions.length + 1,
-        question: cleanQuestion,
+        question: finalQuestion,
         type: questionType,
         optionA: questionType === 'COMPLEX_TF' ? 'Benar' : convertLatexToStandardMath(optionA.trim()),
         optionB: questionType === 'COMPLEX_TF' ? 'Salah' : convertLatexToStandardMath(optionB.trim()),
@@ -429,7 +483,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
       if (questionType === 'COMPLEX_TF') {
         payload.statements = statements.map((s, idx) => ({
           id: s.id || `s${idx + 1}`,
-          text: convertLatexToStandardMath(s.text.trim()),
+          text: convertNewlinesToBreakTags(convertLatexToStandardMath(s.text.trim())),
           ...(s.imageUrl && s.imageUrl.trim() ? { imageUrl: s.imageUrl.trim() } : {}),
           isCorrectTrue: Boolean(s.isCorrectTrue),
         }));
@@ -463,8 +517,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
         payload.imageUrl = '';
       }
 
-      if (cleanExplanation) {
-        payload.explanation = cleanExplanation;
+      if (finalExplanation) {
+        payload.explanation = finalExplanation;
       } else if (editingQuestion) {
         payload.explanation = '';
       }
@@ -644,8 +698,15 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
               </div>
 
               {/* Question Text */}
-              <div className="font-bold text-slate-900 text-sm sm:text-base leading-relaxed">
-                {typeof q.question === 'string' ? q.question : String(q.question || '')}
+              <div
+                className="font-bold text-slate-900 text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words"
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'break-word',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {formatQuestionDisplay(typeof q.question === 'string' ? q.question : String(q.question || ''))}
               </div>
 
               {/* Image with Lazy Loading and Fallback UI */}
@@ -1137,20 +1198,135 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({ exams }) => {
                 )}
               </div>
 
-              {/* Question Text */}
-              <div>
-                <label className="block text-slate-700 font-bold uppercase mb-1">
-                  Teks Pertanyaan
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={questionText}
-                  onFocus={() => setActiveField('question')}
-                  onChange={(e) => setQuestionText(e.target.value)}
-                  placeholder="Tuliskan pertanyaan di sini... (contoh: Berapakah hasil dari 25 x 4 : 2? atau luas persegi dengan sisi 12 cm adalah ...)"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-amber-500 font-bold text-sm"
-                />
+              {/* Question Text with Simple WYSIWYG / Paragraph Toolbar */}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <label className="block text-slate-800 font-extrabold uppercase text-[11px] tracking-wider">
+                    Teks Pertanyaan (Mendukung Enter / Baris Baru & Paragraf)
+                  </label>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => setQuestionEditorTab(questionEditorTab === 'edit' ? 'preview' : 'edit')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center space-x-1.5 border transition-all cursor-pointer ${
+                        questionEditorTab === 'preview'
+                          ? 'bg-amber-100 text-amber-950 border-amber-300 shadow-2xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900'
+                      }`}
+                    >
+                      <Eye className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{questionEditorTab === 'preview' ? 'Kembali ke Editor' : 'Pratinjau Tampilan Siswa'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* WYSIWYG Action Toolbar */}
+                <div className="bg-slate-100 border border-slate-200 rounded-t-xl px-2.5 py-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                  <div className="flex items-center space-x-1 pr-2 border-r border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => handleApplyFormat('**', '**')}
+                      title="Teks Tebal (Bold)"
+                      className="px-2 py-1 bg-white hover:bg-slate-200 text-slate-800 font-black rounded-md border border-slate-300 shadow-2xs cursor-pointer flex items-center space-x-0.5"
+                    >
+                      <Bold className="w-3.5 h-3.5" />
+                      <span>B</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyFormat('*', '*')}
+                      title="Teks Miring (Italic)"
+                      className="px-2 py-1 bg-white hover:bg-slate-200 text-slate-800 italic font-serif font-bold rounded-md border border-slate-300 shadow-2xs cursor-pointer flex items-center space-x-0.5"
+                    >
+                      <Italic className="w-3.5 h-3.5" />
+                      <span>I</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyFormat('<u>', '</u>')}
+                      title="Garis Bawah (Underline)"
+                      className="px-2 py-1 bg-white hover:bg-slate-200 text-slate-800 underline font-bold rounded-md border border-slate-300 shadow-2xs cursor-pointer flex items-center space-x-0.5"
+                    >
+                      <Underline className="w-3.5 h-3.5" />
+                      <span>U</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center space-x-1 pr-2 border-r border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => handleApplyFormat('\n\n', '')}
+                      title="Sisipkan Paragraf Baru (2x Enter)"
+                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold rounded-md border border-amber-300 shadow-2xs cursor-pointer flex items-center space-x-1"
+                    >
+                      <Pilcrow className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Paragraf Baru</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyFormat('\n• ', '')}
+                      title="Sisipkan Poin / Buletin"
+                      className="px-2 py-1 bg-white hover:bg-slate-200 text-slate-800 font-bold rounded-md border border-slate-300 shadow-2xs cursor-pointer flex items-center space-x-1"
+                    >
+                      <List className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Poin (•)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyFormat('\n1. ', '')}
+                      title="Sisipkan Nomor Daftar"
+                      className="px-2 py-1 bg-white hover:bg-slate-200 text-slate-800 font-bold rounded-md border border-slate-300 shadow-2xs cursor-pointer flex items-center space-x-1"
+                    >
+                      <ListOrdered className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Nomor (1.)</span>
+                    </button>
+                  </div>
+
+                  <span className="text-[11px] text-slate-500 font-medium ml-auto hidden sm:inline">
+                    Enter otomatis dikonversi ke &lt;br&gt; saat disimpan
+                  </span>
+                </div>
+
+                {questionEditorTab === 'preview' ? (
+                  <div className="p-4 bg-amber-50/40 border border-slate-200 rounded-b-xl min-h-[140px] max-h-60 overflow-y-auto space-y-2">
+                    <div className="text-[11px] font-extrabold text-amber-900 uppercase tracking-wide flex items-center space-x-1">
+                      <Eye className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Tampilan di Layar Ujian Siswa:</span>
+                    </div>
+                    <div
+                      className="text-sm font-bold text-slate-800 leading-relaxed whitespace-pre-wrap break-words bg-white p-3.5 rounded-xl border border-amber-200 shadow-xs"
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {formatQuestionDisplay(questionText) || (
+                        <span className="text-slate-400 italic">Belum ada teks pertanyaan...</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <textarea
+                    ref={questionTextareaRef}
+                    rows={5}
+                    required
+                    value={questionText}
+                    onFocus={() => setActiveField('question')}
+                    onChange={(e) => setQuestionText(e.target.value)}
+                    placeholder="Tuliskan pertanyaan di sini...&#10;Tekan Enter untuk baris baru atau paragraf baru.&#10;Format spasi, baris baru, dan paragraf akan tersimpan utuh ke database!"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-t-0 border-slate-200 rounded-b-xl text-slate-900 focus:outline-none focus:border-amber-500 font-medium text-sm leading-relaxed whitespace-pre-wrap"
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      overflowWrap: 'break-word',
+                    }}
+                  />
+                )}
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                  <span>💡 Tips: Tekan <strong>Enter</strong> untuk membuat baris baru. Tekan Enter 2 kali untuk jarak antar paragraf.</span>
+                  <span>{questionText.split('\n').filter(Boolean).length} baris / paragraf</span>
+                </div>
               </div>
 
               {/* Image Upload for Question */}

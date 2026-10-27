@@ -20,6 +20,7 @@ import { Exam, Question, QuestionType, QuestionStatement } from '../../types';
 import { downloadQuestionImportTemplate } from '../../services/exportService';
 import { importQuestionsBatch } from '../../services/firebase/examService';
 import { convertLatexToStandardMath } from '../../utils/mathFormatter';
+import { convertNewlinesToBreakTags } from '../../utils/textFormatter';
 
 interface ExcelImporterProps {
   exams: Exam[];
@@ -295,7 +296,7 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       const payload: Omit<Question, 'questionId' | 'examId' | 'createdAt' | 'updatedAt'>[] = validRows.map((r, i) => {
         const item: Omit<Question, 'questionId' | 'examId' | 'createdAt' | 'updatedAt'> = {
           number: i + 1,
-          question: r.question,
+          question: convertNewlinesToBreakTags(r.question),
           type: r.type,
           optionA: r.optionA,
           optionB: r.optionB,
@@ -303,14 +304,17 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
           weight: Number(r.weight) || 20,
         };
         if (r.type === 'COMPLEX_TF' && r.statements) {
-          item.statements = r.statements;
+          item.statements = r.statements.map((s) => ({
+            ...s,
+            text: convertNewlinesToBreakTags(s.text),
+          }));
         } else if (r.type === 'COMPLEX' && r.correctAnswers) {
           item.correctAnswers = r.correctAnswers;
         }
         if (r.optionC) item.optionC = r.optionC;
         if (r.optionD) item.optionD = r.optionD;
         if (r.imageUrl && String(r.imageUrl).trim()) item.imageUrl = String(r.imageUrl).trim();
-        if (r.explanation && String(r.explanation).trim()) item.explanation = String(r.explanation).trim();
+        if (r.explanation && String(r.explanation).trim()) item.explanation = convertNewlinesToBreakTags(String(r.explanation).trim());
         return item;
       });
 
