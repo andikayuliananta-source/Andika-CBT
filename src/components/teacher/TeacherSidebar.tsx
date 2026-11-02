@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { User } from '../../types';
 
@@ -19,6 +20,7 @@ export type TeacherTab =
   | 'participants'
   | 'results'
   | 'import'
+  | 'proctors'
   | 'settings';
 
 interface TeacherSidebarProps {
@@ -41,6 +43,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
     { tab: 'participants', label: 'Peserta', icon: <Users className="w-5 h-5" /> },
     { tab: 'results', label: 'Hasil Ujian', icon: <BarChart3 className="w-5 h-5" /> },
     { tab: 'import', label: 'Import Soal', icon: <FileSpreadsheet className="w-5 h-5" /> },
+    { tab: 'proctors', label: 'Manajemen Proktor', icon: <ShieldCheck className="w-5 h-5" /> },
     { tab: 'settings', label: 'Pengaturan', icon: <Settings className="w-5 h-5" /> },
   ];
 

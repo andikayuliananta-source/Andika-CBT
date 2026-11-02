@@ -8,6 +8,8 @@ import { ExamEngine } from './components/student/ExamEngine';
 import { StudentResultView } from './components/student/StudentResultView';
 import { TeacherPortal } from './pages/TeacherPortal';
 import { TeacherAuthModal } from './components/teacher/TeacherAuthModal';
+import { ProctorLogin } from './components/proctor/ProctorLogin';
+import { ProctorDashboard } from './components/proctor/ProctorDashboard';
 import {
   User,
   Exam,
@@ -16,6 +18,7 @@ import {
   StudentSafeQuestion,
   Result,
   ActiveCrashSession,
+  ProctorSession,
 } from './types';
 import {
   subscribeToAuthChanges,
@@ -23,6 +26,11 @@ import {
   PRIMARY_ADMIN_EMAIL,
   isAuthorizedAdminEmail,
 } from './services/firebase/authService';
+import {
+  getStoredProctorSession,
+  clearProctorSession,
+  seedDefaultProctorIfNone,
+} from './services/firebase/proctorService';
 import {
   getExams,
   startExamSession,
@@ -43,12 +51,17 @@ type AppView =
   | 'STUDENT_CONFIRM'
   | 'STUDENT_EXAM'
   | 'STUDENT_RESULT'
-  | 'TEACHER_PORTAL';
+  | 'TEACHER_PORTAL'
+  | 'PROCTOR_LOGIN'
+  | 'PROCTOR_DASHBOARD';
 
 export default function App() {
   // Navigation & View State
   const [currentView, setCurrentView] = useState<AppView>('LANDING');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentProctor, setCurrentProctor] = useState<ProctorSession | null>(() =>
+    getStoredProctorSession()
+  );
   const [showTeacherAuthModal, setShowTeacherAuthModal] = useState(false);
 
   // Student Exam Session State
@@ -88,6 +101,7 @@ export default function App() {
   useEffect(() => {
     async function initCheck() {
       try {
+        await seedDefaultProctorIfNone();
         let exams = await getExams();
         if (exams.length === 0) {
           await seedSampleSDExams('admin_ceria');
@@ -105,9 +119,15 @@ export default function App() {
   }, []);
 
   // Handle portal selection from Landing Page
-  const handleSelectPortal = (portal: 'student' | 'teacher') => {
+  const handleSelectPortal = (portal: 'student' | 'teacher' | 'proctor') => {
     if (portal === 'student') {
       setCurrentView('STUDENT_TOKEN');
+    } else if (portal === 'proctor') {
+      if (currentProctor) {
+        setCurrentView('PROCTOR_DASHBOARD');
+      } else {
+        setCurrentView('PROCTOR_LOGIN');
+      }
     } else {
       if (currentUser && isAuthorizedAdminEmail(currentUser.email)) {
         setCurrentView('TEACHER_PORTAL');
@@ -119,6 +139,17 @@ export default function App() {
         setShowTeacherAuthModal(true);
       }
     }
+  };
+
+  const handleProctorLoginSuccess = (session: ProctorSession) => {
+    setCurrentProctor(session);
+    setCurrentView('PROCTOR_DASHBOARD');
+  };
+
+  const handleProctorLogout = () => {
+    clearProctorSession();
+    setCurrentProctor(null);
+    setCurrentView('LANDING');
   };
 
   // Student Token Verified -> Move to Confirmation Screen
@@ -305,13 +336,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFDFD] text-slate-800">
-      {/* Show Navbar when not in active student exam engine */}
-      {currentView !== 'STUDENT_EXAM' && currentView !== 'TEACHER_PORTAL' && (
+      {/* Show Navbar when not in active student exam engine or proctor dashboard */}
+      {currentView !== 'STUDENT_EXAM' && currentView !== 'TEACHER_PORTAL' && currentView !== 'PROCTOR_DASHBOARD' && (
         <Navbar
           currentView={currentView}
           currentUser={currentUser}
           onOpenTeacherPortal={() => handleSelectPortal('teacher')}
           onOpenStudentPortal={() => handleSelectPortal('student')}
+          onOpenProctorPortal={() => handleSelectPortal('proctor')}
           onGoHome={handleResetToHome}
         />
       )}
@@ -484,6 +516,28 @@ export default function App() {
             </div>
           )
         )}
+
+        {currentView === 'PROCTOR_LOGIN' && (
+          <ProctorLogin
+            onSuccess={handleProctorLoginSuccess}
+            onBackToHome={handleResetToHome}
+          />
+        )}
+
+        {currentView === 'PROCTOR_DASHBOARD' && (
+          currentProctor ? (
+            <ProctorDashboard
+              proctorSession={currentProctor}
+              onLogout={handleProctorLogout}
+              onGoHome={handleResetToHome}
+            />
+          ) : (
+            <ProctorLogin
+              onSuccess={handleProctorLoginSuccess}
+              onBackToHome={handleResetToHome}
+            />
+          )
+        )}
       </main>
 
       {/* Teacher Authentication Modal */}
@@ -494,10 +548,10 @@ export default function App() {
         />
       )}
 
-      {/* Footer when not inside active exam */}
-      {currentView !== 'STUDENT_EXAM' && currentView !== 'TEACHER_PORTAL' && (
-        <Footer />
-      )}
+      {/* Footer when not inside active exam, teacher portal, or proctor dashboard */}
+      {currentView !== 'STUDENT_EXAM' &&
+        currentView !== 'TEACHER_PORTAL' &&
+        currentView !== 'PROCTOR_DASHBOARD' && <Footer />}
     </div>
   );
 }

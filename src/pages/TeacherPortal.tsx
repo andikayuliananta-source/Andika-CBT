@@ -8,6 +8,7 @@ import { ExcelImporter } from '../components/teacher/ExcelImporter';
 import { ResultsAnalytics } from '../components/teacher/ResultsAnalytics';
 import { ParticipantMonitor } from '../components/teacher/ParticipantMonitor';
 import { SettingsView } from '../components/teacher/SettingsView';
+import { ProctorManagement } from '../components/teacher/ProctorManagement';
 import {
   getExams,
   getParticipants,
@@ -194,6 +195,10 @@ export const TeacherPortal: React.FC<TeacherPortalProps> = ({
                     setCurrentTab('questions');
                   }}
                 />
+              )}
+
+              {currentTab === 'proctors' && (
+                <ProctorManagement currentUserUid={currentUser.uid} />
               )}
 
               {currentTab === 'settings' && (

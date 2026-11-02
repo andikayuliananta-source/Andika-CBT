@@ -132,12 +132,34 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan" }
       },
       "required": ["settingId", "appName"]
+    },
+    "Proctor": {
+      "title": "Proctor",
+      "description": "Akun pengawas ruang ujian / proktor CBT CERIA",
+      "type": "object",
+      "properties": {
+        "proctorId": { "type": "string", "description": "ID unik proktor" },
+        "username": { "type": "string", "description": "Username login proktor", "maxLength": 50 },
+        "password": { "type": "string", "description": "Password login proktor", "maxLength": 100 },
+        "name": { "type": "string", "description": "Nama lengkap proktor", "maxLength": 100 },
+        "roomOrLab": { "type": "string", "description": "Penempatan ruangan atau lab komputer", "maxLength": 100 },
+        "status": { "type": "string", "description": "Status akun proktor", "enum": ["ACTIVE", "INACTIVE"] },
+        "assignedExamIds": { "type": "array", "description": "Daftar ID ujian yang diawasi (opsional)" },
+        "createdBy": { "type": "string", "description": "UID Admin pembuat" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan akun" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan akun" }
+      },
+      "required": ["proctorId", "username", "password", "name", "status", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "Data profil guru dan admin"
+    },
+    "/proctors/{proctorId}": {
+      "schema": "Proctor",
+      "description": "Koleksi akun proktor pengawas ujian"
     },
     "/exams/{examId}": {
       "schema": "Exam",

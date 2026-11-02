@@ -3,11 +3,12 @@ import { Sparkles, GraduationCap, School, LogOut, ArrowLeft } from 'lucide-react
 import { User } from '../../types';
 
 interface NavbarProps {
-  currentView?: 'landing' | 'student' | 'teacher' | 'LANDING' | 'STUDENT_TOKEN' | 'STUDENT_CONFIRM' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'TEACHER_PORTAL' | string;
-  onNavigate?: (view: 'landing' | 'student' | 'teacher') => void;
+  currentView?: 'landing' | 'student' | 'teacher' | 'proctor' | 'LANDING' | 'STUDENT_TOKEN' | 'STUDENT_CONFIRM' | 'STUDENT_EXAM' | 'STUDENT_RESULT' | 'TEACHER_PORTAL' | 'PROCTOR_LOGIN' | 'PROCTOR_DASHBOARD' | string;
+  onNavigate?: (view: 'landing' | 'student' | 'teacher' | 'proctor') => void;
   onGoHome?: () => void;
   onOpenStudentPortal?: () => void;
   onOpenTeacherPortal?: () => void;
+  onOpenProctorPortal?: () => void;
   currentUser?: User | null;
   onLogout?: () => void;
 }
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onGoHome,
   onOpenStudentPortal,
   onOpenTeacherPortal,
+  onOpenProctorPortal,
   currentUser,
   onLogout,
 }) => {
@@ -36,6 +38,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       onOpenStudentPortal();
     } else if (onNavigate) {
       onNavigate('student');
+    }
+  };
+
+  const handleProctor = () => {
+    if (onOpenProctorPortal) {
+      onOpenProctorPortal();
+    } else if (onNavigate) {
+      onNavigate('proctor');
     }
   };
 
@@ -96,6 +106,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <span>🎓</span>
                 <span>Siswa</span>
+              </button>
+              <button
+                id="header-proctor-btn"
+                type="button"
+                onClick={handleProctor}
+                className="flex items-center space-x-1.5 text-xs sm:text-sm font-bold bg-emerald-100 text-emerald-900 hover:bg-emerald-200 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border border-emerald-300/80 shadow-2xs"
+                title="Portal Pengawas & Proktor Ruangan"
+              >
+                <span>🛡️</span>
+                <span>Proktor</span>
               </button>
               <button
                 id="header-teacher-btn"

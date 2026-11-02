@@ -43,6 +43,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Proctors collection
+    match /proctors/{proctorId} {
+      allow get, list: if true;
+      allow create, update, delete: if isTeacher();
+    }
+
     // Exams collection
     match /exams/{examId} {
       allow get, list: if true;

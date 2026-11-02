@@ -193,3 +193,25 @@ export interface ActiveCrashSession {
   currentIndex?: number;
   savedAt: string;
 }
+
+export interface Proctor {
+  proctorId: string;
+  username: string;
+  password: string;
+  name: string;
+  roomOrLab?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  assignedExamIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface ProctorSession {
+  proctorId: string;
+  username: string;
+  name: string;
+  roomOrLab?: string;
+  loginAt: string;
+}
+

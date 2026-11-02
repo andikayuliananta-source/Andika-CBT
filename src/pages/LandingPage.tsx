@@ -3,7 +3,7 @@ import { Rocket, BookOpen, Trophy, Star, Sparkles, CheckCircle2, ShieldCheck, La
 import { TopScorersLeaderboard } from '../components/landing/TopScorersLeaderboard';
 
 interface LandingPageProps {
-  onSelectPortal: (portal: 'student' | 'teacher') => void;
+  onSelectPortal: (portal: 'student' | 'teacher' | 'proctor') => void;
   onStartDemoExam?: () => void;
 }
 
@@ -81,28 +81,51 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
 
-        {/* TWO PRIMARY PORTALS (MANDATORY PROMINENT BUTTONS) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-2xl mx-auto pt-2">
+        {/* THREE PRIMARY PORTALS (MANDATORY PROMINENT BUTTONS) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 max-w-4xl mx-auto pt-2">
           {/* PORTAL SISWA */}
           <button
             id="portal-siswa-card-btn"
             onClick={() => onSelectPortal('student')}
-            className="group relative bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 text-center border-4 border-amber-300 flex flex-col items-center justify-between"
+            className="group relative bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-3xl p-5 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 text-center border-4 border-amber-300 flex flex-col items-center justify-between cursor-pointer"
           >
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-4xl mb-3 group-hover:scale-110 transition-transform">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition-transform">
               🎓
             </div>
             <div>
-              <h2 className="font-display text-2xl font-black tracking-wide text-white drop-shadow-xs">
+              <h2 className="font-display text-xl font-black tracking-wide text-white drop-shadow-xs">
                 PORTAL SISWA
               </h2>
               <p className="text-amber-100 text-xs font-semibold mt-1">
                 Masukkan nama, kelas, & token untuk mulai mengerjakan soal
               </p>
             </div>
-            <div className="mt-4 bg-white text-amber-900 font-extrabold px-6 py-2.5 rounded-full text-sm shadow-sm group-hover:bg-amber-100 flex items-center space-x-2">
+            <div className="mt-4 bg-white text-amber-900 font-extrabold px-5 py-2 rounded-full text-xs sm:text-sm shadow-sm group-hover:bg-amber-100 flex items-center space-x-2">
               <Rocket className="w-4 h-4 text-amber-600" />
-              <span>Mulai sebagai Siswa</span>
+              <span>Mulai Ujian</span>
+            </div>
+          </button>
+
+          {/* PORTAL PROKTOR */}
+          <button
+            id="portal-proktor-card-btn"
+            onClick={() => onSelectPortal('proctor')}
+            className="group relative bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-3xl p-5 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 text-center border-4 border-emerald-400 flex flex-col items-center justify-between cursor-pointer"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition-transform">
+              🛡️
+            </div>
+            <div>
+              <h2 className="font-display text-xl font-black tracking-wide text-white drop-shadow-xs">
+                PORTAL PROKTOR
+              </h2>
+              <p className="text-emerald-100 text-xs font-semibold mt-1">
+                Reset sesi terkunci, pantau ujian live, & unduh rekap nilai
+              </p>
+            </div>
+            <div className="mt-4 bg-white text-emerald-900 font-extrabold px-5 py-2 rounded-full text-xs sm:text-sm shadow-sm group-hover:bg-emerald-50 flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              <span>Masuk Proktor</span>
             </div>
           </button>
 
@@ -110,22 +133,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <button
             id="portal-guru-card-btn"
             onClick={() => onSelectPortal('teacher')}
-            className="group relative bg-gradient-to-b from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-3xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 text-center border-4 border-blue-400 flex flex-col items-center justify-between"
+            className="group relative bg-gradient-to-b from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-3xl p-5 sm:p-6 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 text-center border-4 border-blue-400 flex flex-col items-center justify-between cursor-pointer"
           >
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-4xl mb-3 group-hover:scale-110 transition-transform">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition-transform">
               👨‍🏫
             </div>
             <div>
-              <h2 className="font-display text-2xl font-black tracking-wide text-white drop-shadow-xs">
+              <h2 className="font-display text-xl font-black tracking-wide text-white drop-shadow-xs">
                 PORTAL GURU
               </h2>
               <p className="text-blue-100 text-xs font-semibold mt-1">
-                Kelola ujian, bank soal, pantau siswa, & unduh rekap nilai
+                Kelola ujian, bank soal, manajemen proktor, & analisis
               </p>
             </div>
-            <div className="mt-4 bg-white text-blue-900 font-extrabold px-6 py-2.5 rounded-full text-sm shadow-sm group-hover:bg-blue-100 flex items-center space-x-2">
+            <div className="mt-4 bg-white text-blue-900 font-extrabold px-5 py-2 rounded-full text-xs sm:text-sm shadow-sm group-hover:bg-blue-100 flex items-center space-x-2">
               <BookOpen className="w-4 h-4 text-blue-600" />
-              <span>Masuk sebagai Guru</span>
+              <span>Masuk Guru</span>
             </div>
           </button>
         </div>

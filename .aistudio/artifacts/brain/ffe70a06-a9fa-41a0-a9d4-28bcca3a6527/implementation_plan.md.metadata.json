@@ -1,0 +1,6 @@
+{
+  "summary":  "Rencana implementasi penambahan Portal Proktor pada aplikasi CBT CERIA. Mencakup pembaruan navigasi Landing Page, menu Manajemen Proktor di Portal Guru/Admin dengan operasi CRUD lengkap, portal login dan dashboard mandiri untuk Proktor dengan 3 fitur inti (Reset Peserta tanpa menghapus jawaban, Pantau Ujian real-time, dan Rekap Hasil Ujian dengan ekspor CSV/Excel), skema database Firestore 'proctors', serta arsitektur otorisasi sesi terisolasi.",
+  "updatedAt":  "2026-10-31T04:28:48.904591780Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
